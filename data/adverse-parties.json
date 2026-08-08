@@ -1,0 +1,11 @@
+{
+  "_comment": "Conflict-check list for Reyes & Cole Injury Law (fictional demo data). Names here are current clients or adverse parties in active matters. Any new inquiry naming one of these people as the party to pursue must be flagged for conflicts review before intake proceeds.",
+  "parties": [
+    { "name": "Marcus Whitfield", "relationship": "Current client — Whitfield v. Crown Deli Corp. (premises liability, active)" },
+    { "name": "Crown Deli Corp.", "relationship": "Adverse party — Whitfield v. Crown Deli Corp. (active)" },
+    { "name": "Delia Okafor", "relationship": "Current client — Okafor v. TransBridge Logistics LLC (motor vehicle, active)" },
+    { "name": "TransBridge Logistics LLC", "relationship": "Adverse party — Okafor v. TransBridge Logistics LLC (active)" },
+    { "name": "Ray Petrosyan", "relationship": "Former client — Petrosyan v. 1188 Flatbush Realty (settled 2024)" },
+    { "name": "1188 Flatbush Realty", "relationship": "Adverse party — Petrosyan v. 1188 Flatbush Realty (settled 2024)" }
+  ]
+}
