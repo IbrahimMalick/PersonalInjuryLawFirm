@@ -45,3 +45,7 @@ next-env.d.ts
 
 # allow the template env file
 !.env.example
+
+# generated agent docs
+AGENTS.md
+CLAUDE.md

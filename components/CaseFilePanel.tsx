@@ -118,11 +118,22 @@ export default function CaseFilePanel({ lead }: { lead: Lead | null }) {
 
       <div className="px-5 py-4 space-y-3.5">
         <div className={animate ? "reveal-row" : undefined} style={animate ? ({ "--reveal-delay": `${d()}ms` } as React.CSSProperties) : undefined}>
-          <div className="flex items-baseline justify-between gap-3 border-b-2 border-papertext/20 pb-2">
-            <span className="font-display font-bold text-2xl uppercase tracking-wide">
-              {cf.claimant.name ?? "Name unknown"}
+          <div className="flex items-center justify-between gap-3 border-b-2 border-papertext/20 pb-2">
+            <span>
+              <span className="block font-display font-bold text-2xl uppercase tracking-wide leading-none">
+                {cf.claimant.name ?? "Name unknown"}
+              </span>
+              <span className="font-mono text-sm text-paperdim">{CASE_TYPE_LABEL[cf.caseType]}</span>
             </span>
-            <span className="font-mono text-sm">{CASE_TYPE_LABEL[cf.caseType]}</span>
+            {/* The verdict lands last in time, but lives above the fold. */}
+            <span
+              className={`stamp-box text-xl shrink-0 ${animate ? "reveal-stamp" : ""} ${
+                cf.routing === "decline" || conflict ? "text-stamp" : "text-carbon"
+              }`}
+              style={animate ? ({ "--reveal-delay": `${13 * 150 + 250}ms` } as React.CSSProperties) : undefined}
+            >
+              {conflict ? "CONFLICT — HOLD" : ROUTING_LABEL[cf.routing]}
+            </span>
           </div>
         </div>
 
@@ -131,8 +142,12 @@ export default function CaseFilePanel({ lead }: { lead: Lead | null }) {
             <span className="font-mono">{val(cf.claimant.phone)}</span>
           </Row>
           <Row label="Email / language" delay={d()} animate={animate}>
-            <span className="font-mono">{cf.claimant.email ?? "—"}</span>
-            {" · "}
+            {cf.claimant.email ? (
+              <>
+                <span className="font-mono">{cf.claimant.email}</span>
+                {" · "}
+              </>
+            ) : null}
             {cf.claimant.preferredLanguage === "es" ? "Spanish" : "English"}
           </Row>
           <Row label="Incident date" delay={d()} animate={animate}>
@@ -237,21 +252,24 @@ export default function CaseFilePanel({ lead }: { lead: Lead | null }) {
           </div>
         </div>
 
-        <div className="flex items-center justify-between pt-1 pb-2">
-          <span
-            className={`stamp-box text-2xl ${animate ? "reveal-stamp" : ""} ${
-              cf.routing === "decline" || conflict ? "text-stamp" : "text-carbon"
-            }`}
-            style={animate ? ({ "--reveal-delay": `${d()}ms` } as React.CSSProperties) : undefined}
-          >
-            {conflict ? "CONFLICT — HOLD" : ROUTING_LABEL[cf.routing]}
-          </span>
-          <span className="text-sm text-paperdim max-w-[46%] text-right leading-snug">
-            {conflict
-              ? "Nothing goes out. A person decides who calls whom."
-              : ROUTING_SENTENCE[cf.routing]}
-            {cf.needsHumanReview && !conflict ? " · Human review required." : ""}
-          </span>
+        <div
+          className={animate ? "reveal-row" : undefined}
+          style={animate ? ({ "--reveal-delay": `${d()}ms` } as React.CSSProperties) : undefined}
+        >
+          <div className="flex items-center justify-between gap-3 pb-2 text-sm text-paperdim">
+            <span className="leading-snug">
+              {conflict
+                ? "Nothing goes out. A person decides who calls whom."
+                : ROUTING_SENTENCE[cf.routing]}
+              {cf.needsHumanReview && !conflict ? " · Human review required." : ""}
+            </span>
+            <a
+              href={`/case/${lead.id}`}
+              className="field-label text-carbon underline underline-offset-4 shrink-0 hover:text-papertext"
+            >
+              Open case file ▸
+            </a>
+          </div>
         </div>
       </div>
     </aside>
