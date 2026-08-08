@@ -1,26 +1,145 @@
 @import "tailwindcss";
 
+/* ── Night Docket tokens ────────────────────────────────────────────────────
+   ink    #151C28  midnight blue-black — the 2:47 AM ground
+   carbon #2E3A5C  carbon-copy blue — panels, inbound bubbles
+   manila #E8D5A3  folder stock — case cards, tabs
+   paper  #F6F2E7  report paper — letterhead, detail sheets
+   stamp  #BF3B2B  rubber-stamp red — conflicts, declines, SOL urgency
+   meter  #FFB020  timestamp amber — owned by the clock and timers only
+*/
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --ink: #151c28;
+  --ink-raised: #1d2636;
+  --ink-line: #32405c;
+  --carbon: #2e3a5c;
+  --manila: #e8d5a3;
+  --manila-deep: #d9bf7f;
+  --paper: #f6f2e7;
+  --paper-dim: #eae4d3;
+  --stamp: #bf3b2b;
+  --meter: #ffb020;
+  --text-on-ink: #e9e5d9;
+  --text-dim: #9aa5bd;
+  --text-on-paper: #241f16;
+  --text-on-paper-dim: #6b6353;
+  --ok: #7fae7a;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-ink: var(--ink);
+  --color-ink-raised: var(--ink-raised);
+  --color-ink-line: var(--ink-line);
+  --color-carbon: var(--carbon);
+  --color-manila: var(--manila);
+  --color-manila-deep: var(--manila-deep);
+  --color-paper: var(--paper);
+  --color-paper-dim: var(--paper-dim);
+  --color-stamp: var(--stamp);
+  --color-meter: var(--meter);
+  --color-inktext: var(--text-on-ink);
+  --color-dim: var(--text-dim);
+  --color-papertext: var(--text-on-paper);
+  --color-paperdim: var(--text-on-paper-dim);
+  --color-ok: var(--ok);
+  --font-display: var(--font-barlow);
+  --font-sans: var(--font-plex-sans);
+  --font-mono: var(--font-plex-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--ink);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--ink);
+  color: var(--text-on-ink);
+  font-family: var(--font-plex-sans), system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* Police-report field label: overline mono caps */
+.field-label {
+  font-family: var(--font-plex-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* Rubber stamp treatment for routing verdicts */
+.stamp-box {
+  display: inline-block;
+  font-family: var(--font-barlow), sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border: 3px solid currentColor;
+  border-radius: 4px;
+  padding: 0.1em 0.5em;
+  transform: rotate(-2deg);
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='2'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.9 0.08'/></filter><rect width='120' height='120' fill='white' filter='url(%23n)'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='2'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0.9 0.08'/></filter><rect width='120' height='120' fill='white' filter='url(%23n)'/></svg>");
+}
+
+/* Manila folder tab notch */
+.folder-tab {
+  position: relative;
+  border-top-left-radius: 6px;
+  border-top-right-radius: 12px;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 100%, 0 100%);
+}
+
+/* ── The one orchestrated reveal ─────────────────────────────────────────────
+   Case-file rows populate top to bottom; the routing stamp lands last. */
+@keyframes reveal-row {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes stamp-land {
+  0% {
+    opacity: 0;
+    transform: rotate(-2deg) scale(1.7);
+  }
+  70% {
+    opacity: 1;
+    transform: rotate(-2deg) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(-2deg) scale(1);
+  }
+}
+.reveal-row {
+  opacity: 0;
+  animation: reveal-row 0.28s ease-out forwards;
+  animation-delay: var(--reveal-delay, 0ms);
+}
+.reveal-stamp {
+  opacity: 0;
+  animation: stamp-land 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.2) forwards;
+  animation-delay: var(--reveal-delay, 0ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal-row,
+  .reveal-stamp {
+    animation: none;
+    opacity: 1;
+    transform: rotate(-2deg);
+  }
+  .reveal-row {
+    transform: none;
+  }
+}
+
+/* Scrollbars that don't glow on camera */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-line) transparent;
 }
