@@ -8,7 +8,7 @@ import ControlBar from "./ControlBar";
 
 function FirmMark() {
   return (
-    <Link href="/" className="flex items-center gap-3 shrink-0">
+    <Link href="/demo" className="flex items-center gap-3 shrink-0">
       <span
         aria-hidden
         className="grid place-items-center w-10 h-10 rounded-sm border-2 border-manila text-manila font-display font-bold text-lg leading-none tracking-tight"
@@ -28,9 +28,9 @@ function FirmMark() {
 function NavTabs() {
   const path = usePathname();
   const tabs = [
-    { href: "/", label: "Live Desk" },
-    { href: "/gap", label: "Cost of the Gap" },
-    { href: "/guardrails", label: "Guardrails" },
+    { href: "/demo", label: "Live Desk" },
+    { href: "/demo/gap", label: "Cost of the Gap" },
+    { href: "/demo/guardrails", label: "Guardrails" },
   ];
   return (
     <nav className="flex items-end gap-1 h-full" aria-label="Screens">

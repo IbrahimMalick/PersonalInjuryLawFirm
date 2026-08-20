@@ -1,14 +1,30 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { CONDUCT_RULES, REVIEW_RULES } from "./guardrails";
-import { checkConflicts } from "./conflicts";
+import { conductRules, REVIEW_RULES } from "./guardrails";
+import { matchConflicts, type ConflictParty } from "./conflicts";
 import { computeSOL } from "./sol-table";
 import { fallbackFor } from "./fallbacks";
-import { zModelOutput, type CaseFile, type Lead, type ModelOutput } from "./schema";
+import { zModelOutput, type CaseFile, type Channel, type ModelOutput } from "./schema";
 
 const MODEL = "claude-sonnet-4-6";
 
-// The conduct rules live in lib/guardrails.ts so the Guardrails screen shows
-// the real text. Below we add the output contract.
+// Channel-neutral input: the demo maps its seeded leads here, the product
+// maps rows from the leads table.
+export interface ExtractionInput {
+  id: string;
+  channel: Channel | "email";
+  from: string;
+  displayName: string | null;
+  raw: string;
+  meta?: {
+    durationSec?: number;
+    photos?: string[];
+    formFields?: Record<string, string>;
+    subject?: string;
+  };
+  receivedLabel: string;
+  breakIt?: boolean; // demo-only choreography flag
+}
+
 const OUTPUT_CONTRACT = `
 Today's date is {{TODAY}}. Resolve relative dates ("last night", "Tuesday")
 against it. The message below arrived at the firm at {{RECEIVED}}.
@@ -54,26 +70,31 @@ Field notes:
   conduct rules above. Do not add a signature block or disclaimer — the
   application appends the firm's standard disclaimer.`;
 
-function buildPrompt(lead: Lead, today: string): { system: string; user: string } {
-  const system = CONDUCT_RULES + "\n" + OUTPUT_CONTRACT.replace("{{TODAY}}", today).replace(
-    "{{RECEIVED}}",
-    `${lead.receivedLabel} (overnight)`
-  );
-  const channelDesc: Record<Lead["channel"], string> = {
-    voicemail: `Voicemail transcript from ${lead.from}${lead.meta?.durationSec ? ` (${Math.floor(lead.meta.durationSec / 60)}:${String(lead.meta.durationSec % 60).padStart(2, "0")})` : ""}`,
-    sms: `SMS from ${lead.from}`,
-    webform: `Website contact form submission (${lead.from})`,
-    whatsapp: `WhatsApp message from ${lead.displayName ?? "unknown"} (${lead.from})${lead.meta?.photos?.length ? ` with ${lead.meta.photos.length} photo attachments: ${lead.meta.photos.join(", ")}` : ""}`,
+function buildPrompt(
+  input: ExtractionInput,
+  firmName: string,
+  today: string
+): { system: string; user: string } {
+  const system =
+    conductRules(firmName) +
+    "\n" +
+    OUTPUT_CONTRACT.replace("{{TODAY}}", today).replace("{{RECEIVED}}", input.receivedLabel);
+  const dur = input.meta?.durationSec;
+  const channelDesc: Record<string, string> = {
+    voicemail: `Voicemail transcript from ${input.from}${dur ? ` (${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, "0")})` : ""}`,
+    sms: `SMS from ${input.from}`,
+    webform: `Website contact form submission (${input.from})`,
+    whatsapp: `WhatsApp message from ${input.displayName ?? "unknown"} (${input.from})${input.meta?.photos?.length ? ` with ${input.meta.photos.length} photo attachments: ${input.meta.photos.join(", ")}` : ""}`,
+    email: `Email from ${input.displayName ? `${input.displayName} <${input.from}>` : input.from}${input.meta?.subject ? ` — subject: ${input.meta.subject}` : ""}`,
   };
-  return { system, user: `${channelDesc[lead.channel]}:\n\n${lead.raw}` };
+  return { system, user: `${channelDesc[input.channel]}:\n\n${input.raw}` };
 }
 
 // ── Defensive parsing ────────────────────────────────────────────────────────
 
 export class ExtractionError extends Error {}
 
-function parseDefensively(text: string): ModelOutput {
-  // Strip code fences and any prose around the outermost JSON object.
+export function parseDefensively(text: string): ModelOutput {
   let candidate = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
   const first = candidate.indexOf("{");
   const last = candidate.lastIndexOf("}");
@@ -99,37 +120,42 @@ function parseDefensively(text: string): ModelOutput {
   return result.data;
 }
 
-// The "Break it" control injects a lead flagged breakIt. Its first attempt is
-// deliberately corrupted before parsing — the garbled date from the SMS is
-// written into incidentDate, which genuinely fails schema validation — so the
-// on-camera failure and retry are real code paths, not a staged animation.
+// Demo-only: the "Break it" lead's first attempt is deliberately corrupted so
+// the on-camera failure and retry are real code paths.
 function corruptForBreakDemo(text: string): string {
   try {
     const obj = JSON.parse(text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, ""));
     obj.incidentDate = "13/45/2025";
     return JSON.stringify(obj);
   } catch {
-    return text.slice(0, Math.floor(text.length / 2)); // truncated JSON also fails honestly
+    return text.slice(0, Math.floor(text.length / 2));
   }
 }
 
 // ── Model call ───────────────────────────────────────────────────────────────
 
-async function fetchResponseText(lead: Lead, priorError: string | null): Promise<string> {
+async function fetchResponseText(
+  input: ExtractionInput,
+  firmName: string,
+  priorError: string | null,
+  allowFallback: boolean
+): Promise<string> {
   const haveKey = Boolean(process.env.ANTHROPIC_API_KEY);
   if (!haveKey) {
-    // No key configured: serve the cached result as the "response" so every
-    // code path downstream (parsing, validation, the break-it choreography)
-    // still runs for real. Noted on the console only.
-    console.warn(`[nightshift] ANTHROPIC_API_KEY not set — using cached result for ${lead.id}`);
-    const fb = fallbackFor(lead.id);
-    if (!fb) throw new ExtractionError(`No cached result for ${lead.id}`);
+    if (!allowFallback) {
+      throw new ExtractionError("ANTHROPIC_API_KEY is not configured");
+    }
+    // Demo without a key: serve the cached result as the "response" so every
+    // downstream path (parsing, validation, break-it) still runs for real.
+    console.warn(`[nightshift] no API key — using cached result for ${input.id}`);
+    const fb = fallbackFor(input.id);
+    if (!fb) throw new ExtractionError(`No cached result for ${input.id}`);
     return JSON.stringify(fb);
   }
 
   const client = new Anthropic();
   const today = new Date().toISOString().slice(0, 10);
-  const { system, user } = buildPrompt(lead, today);
+  const { system, user } = buildPrompt(input, firmName, today);
   const messages: Anthropic.MessageParam[] = [{ role: "user", content: user }];
   if (priorError) {
     messages.push({
@@ -150,17 +176,19 @@ async function fetchResponseText(lead: Lead, priorError: string | null): Promise
   return textBlock.text;
 }
 
-// ── Orchestration: attempt → retry once → cached fallback ────────────────────
+// ── Orchestration: attempt → retry once → (demo only) cached fallback ────────
 
-export interface ProcessResult {
-  caseFile: CaseFile;
-  draftReply: string;
+export interface ExtractionResult {
+  output: ModelOutput;
   via: "live" | "fallback";
   retried: boolean;
   retryReason: string | null;
 }
 
-export async function processLead(lead: Lead): Promise<ProcessResult> {
+export async function extractModelOutput(
+  input: ExtractionInput,
+  opts: { firmName: string; allowFallback: boolean }
+): Promise<ExtractionResult> {
   const live = Boolean(process.env.ANTHROPIC_API_KEY);
   let output: ModelOutput | null = null;
   let retried = false;
@@ -169,44 +197,53 @@ export async function processLead(lead: Lead): Promise<ProcessResult> {
 
   for (let attempt = 0; attempt < 2 && !output; attempt++) {
     try {
-      let text = await fetchResponseText(lead, attempt > 0 ? (lastError?.message ?? null) : null);
-      if (lead.breakIt && attempt === 0) text = corruptForBreakDemo(text);
+      let text = await fetchResponseText(
+        input,
+        opts.firmName,
+        attempt > 0 ? (lastError?.message ?? null) : null,
+        opts.allowFallback
+      );
+      if (input.breakIt && attempt === 0) text = corruptForBreakDemo(text);
       output = parseDefensively(text);
     } catch (e) {
       lastError = e as Error;
       if (attempt === 0) {
         retried = true;
         retryReason = lastError.message;
-        console.warn(`[nightshift] attempt 1 failed for ${lead.id}: ${lastError.message} — retrying`);
+        console.warn(`[nightshift] attempt 1 failed for ${input.id}: ${lastError.message} — retrying`);
       }
     }
   }
 
-  let via: "live" | "fallback" = live ? "live" : "fallback";
-  if (!output) {
-    // Both attempts failed — cached pre-computed result keeps the demo moving.
-    console.warn(
-      `[nightshift] falling back to cached result for ${lead.id} after retry: ${lastError?.message}`
-    );
-    const fb = fallbackFor(lead.id);
-    if (!fb) throw new Error(`Extraction failed and no cached fallback exists for ${lead.id}`);
-    output = fb;
-    via = "fallback";
+  if (output) {
+    return { output, via: live ? "live" : "fallback", retried, retryReason };
   }
 
-  return { ...buildCaseFile(output, lead), via, retried, retryReason };
+  if (!opts.allowFallback) {
+    // Product behavior: a real inquiry never gets a canned answer. The caller
+    // marks the lead needs_attention and a person reads the raw message.
+    throw new ExtractionError(lastError?.message ?? "Extraction failed twice");
+  }
+
+  console.warn(
+    `[nightshift] falling back to cached result for ${input.id} after retry: ${lastError?.message}`
+  );
+  const fb = fallbackFor(input.id);
+  if (!fb) throw new ExtractionError(`Extraction failed and no cached fallback for ${input.id}`);
+  return { output: fb, via: "fallback", retried, retryReason };
 }
 
 // ── The trust boundary ───────────────────────────────────────────────────────
 // Whatever the model said, code owns these three things:
 //   1. statuteOfLimitations — computed from lib/sol-table.ts date math
-//   2. conflictFlags — matched against data/adverse-parties.json
+//   2. conflictFlags — matched against the firm's conflict list
 //   3. needsHumanReview — forced true on low confidence, conflicts, or sign_now
-function buildCaseFile(
+export function buildCaseFile(
   output: ModelOutput,
-  lead: Lead
+  rawText: string,
+  parties: ConflictParty[]
 ): { caseFile: CaseFile; draftReply: string } {
-  const conflictFlags = checkConflicts(output, lead.raw);
+  const conflictFlags = matchConflicts(output, rawText, parties);
   const statuteOfLimitations = computeSOL(
     output.incidentDate,
     output.jurisdiction,
@@ -240,4 +277,35 @@ function buildCaseFile(
   };
 
   return { caseFile, draftReply: output.draftReply };
+}
+
+// ── Demo compatibility wrapper (used by /api/demo/process) ───────────────────
+import type { Lead as DemoLead } from "./schema";
+import { DEMO_FIRM_NAME } from "./guardrails";
+import { demoParties } from "./conflicts";
+
+export interface ProcessResult {
+  caseFile: CaseFile;
+  draftReply: string;
+  via: "live" | "fallback";
+  retried: boolean;
+  retryReason: string | null;
+}
+
+export async function processLead(lead: DemoLead): Promise<ProcessResult> {
+  const result = await extractModelOutput(
+    {
+      id: lead.id,
+      channel: lead.channel,
+      from: lead.from,
+      displayName: lead.displayName,
+      raw: lead.raw,
+      meta: lead.meta,
+      receivedLabel: `${lead.receivedLabel} (overnight)`,
+      breakIt: lead.breakIt,
+    },
+    { firmName: DEMO_FIRM_NAME, allowFallback: true }
+  );
+  const built = buildCaseFile(result.output, lead.raw, demoParties());
+  return { ...built, via: result.via, retried: result.retried, retryReason: result.retryReason };
 }

@@ -264,7 +264,7 @@ export default function CaseFilePanel({ lead }: { lead: Lead | null }) {
               {cf.needsHumanReview && !conflict ? " · Human review required." : ""}
             </span>
             <a
-              href={`/case/${lead.id}`}
+              href={`/demo/case/${lead.id}`}
               className="field-label text-carbon underline underline-offset-4 shrink-0 hover:text-papertext"
             >
               Open case file ▸

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Barlow_Condensed, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
-import Shell from "@/components/Shell";
 
 const barlow = Barlow_Condensed({
   variable: "--font-barlow",
@@ -32,9 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="en"
       className={`${barlow.variable} ${plexSans.variable} ${plexMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full">
-        <Shell>{children}</Shell>
-      </body>
+      <body className="min-h-full">{children}</body>
     </html>
   );
 }

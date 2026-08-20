@@ -182,7 +182,7 @@ export default function LeadCard({ lead }: { lead: Lead }) {
         )}
         {lead.status === "done" && (
           <a
-            href={`/case/${lead.id}`}
+            href={`/demo/case/${lead.id}`}
             className="field-label text-manila hover:text-meter focus-visible:outline focus-visible:outline-2 focus-visible:outline-meter"
           >
             Open case file ▸

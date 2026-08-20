@@ -42,7 +42,7 @@ export function DeskDataProvider({ children }: { children: React.ReactNode }) {
   clockRef.current = clock;
 
   const refresh = useCallback(async () => {
-    const res = await fetch("/api/state", { cache: "no-store" });
+    const res = await fetch("/api/demo/state", { cache: "no-store" });
     setStore((await res.json()) as Store);
   }, []);
 
@@ -71,7 +71,7 @@ export function DeskDataProvider({ children }: { children: React.ReactNode }) {
           lead.channel === "voicemail"
             ? `Voicemail received — ${lead.from} (${Math.floor((lead.meta?.durationSec ?? 0) / 60)}:${String((lead.meta?.durationSec ?? 0) % 60).padStart(2, "0")})`
             : `Message received — ${lead.from}`;
-        fetch("/api/log", {
+        fetch("/api/demo/log", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ simTime: lead.receivedLabel, line, kind: "info" }),
@@ -97,7 +97,7 @@ export function DeskDataProvider({ children }: { children: React.ReactNode }) {
       setProcessing((p) => new Set(p).add(id));
       setSelectedId(id);
       try {
-        const res = await fetch("/api/process", {
+        const res = await fetch("/api/demo/process", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ leadId: id, simTime: formatSim(clockRef.current.simMs) }),
@@ -165,7 +165,7 @@ export function DeskDataProvider({ children }: { children: React.ReactNode }) {
     if (running) return;
     setRunning(true);
     try {
-      const res = await fetch("/api/break", {
+      const res = await fetch("/api/demo/break", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ simTime: formatSim(clockRef.current.simMs) }),
@@ -180,7 +180,7 @@ export function DeskDataProvider({ children }: { children: React.ReactNode }) {
   }, [running, applyResponse, processOne]);
 
   const reset = useCallback(async () => {
-    const res = await fetch("/api/reset", { method: "POST" });
+    const res = await fetch("/api/demo/reset", { method: "POST" });
     setStore((await res.json()) as Store);
     setProcessing(new Set());
     setRevealAt({});
@@ -192,7 +192,7 @@ export function DeskDataProvider({ children }: { children: React.ReactNode }) {
 
   const logLine = useCallback(
     async (line: string, kind: ActivityEntry["kind"] = "info") => {
-      const res = await fetch("/api/log", {
+      const res = await fetch("/api/demo/log", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ simTime: formatSim(clockRef.current.simMs), line, kind }),
