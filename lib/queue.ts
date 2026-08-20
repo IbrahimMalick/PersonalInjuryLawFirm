@@ -15,9 +15,10 @@ export async function enqueue(
 ): Promise<number> {
   const db = await getDb();
   const runAt = new Date(Date.now() + (opts.delaySeconds ?? 0) * 1000).toISOString();
+  const defaultMax = Number(process.env.NIGHTSHIFT_JOB_MAX_ATTEMPTS ?? 4);
   const rows = await db
     .insert(tables.jobs)
-    .values({ type, payload, runAt, maxAttempts: opts.maxAttempts ?? 4 })
+    .values({ type, payload, runAt, maxAttempts: opts.maxAttempts ?? defaultMax })
     .returning({ id: tables.jobs.id });
   return rows[0].id;
 }

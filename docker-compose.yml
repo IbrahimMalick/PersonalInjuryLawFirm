@@ -1,0 +1,14 @@
+# One firm, one instance. `docker compose up -d`, then open http://localhost:3000
+# and complete first-run setup.
+services:
+  nightshift:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file: .env.local
+    volumes:
+      - nightshift-data:/data
+    restart: unless-stopped
+
+volumes:
+  nightshift-data:

@@ -1,45 +1,65 @@
 # Nightshift — 24/7 AI intake for personal-injury firms
 
-Nightshift is a filmable product demo of an overnight intake engine for a small personal-injury firm (the fictional **Reyes & Cole Injury Law**, Brooklyn NY). Inbound inquiries arrive at all hours in whatever form the client sends — a 3 AM voicemail, an all-caps text, a half-empty web form, a WhatsApp message in Spanish. Nightshift reads each one, extracts a structured case file, scores it, decides whether to pursue, checks it against the firm's conflict list, and drafts a first reply that waits for a human to approve. The firm wakes up to organized cases instead of a chaotic inbox.
+Nightshift answers a small PI firm's intake channels around the clock. Inquiries arrive as
+voicemail, SMS, WhatsApp, email, or the firm's web form — at 3 AM, in whatever shape the
+client sends them. Nightshift reads each one, extracts a structured case file, scores it,
+checks it against the firm's conflict list, computes the filing deadline from a reviewed
+table (never from the model), and drafts a first reply that **waits for a human to approve**.
+The firm wakes up to organized cases instead of a chaotic inbox.
+
+One deployment serves one firm, with its own SQLite database on its own volume — data
+isolation by construction.
 
 ![Live Desk screenshot](docs/screenshot.png)
-*(Live Desk at 1440×900 — replace `docs/screenshot.png` with fresh captures as the build evolves)*
 
-## Setup
+## Quick start
 
 ```bash
 npm install
-cp .env.example .env.local   # add your ANTHROPIC_API_KEY
-npm run dev
+cp .env.example .env.local     # add your ANTHROPIC_API_KEY
+npm run dev                    # → http://localhost:3000, first run walks through /setup
 ```
 
-That's the whole setup. Without an API key the app still runs end to end on cached pre-computed results — extraction, conflict checks, the break-it failure, all of it — so the demo never dead-ends.
+Production, channel wiring (Twilio/SendGrid), backups, and the go-live checklist:
+**[DEPLOY.md](DEPLOY.md)**. The original filmable sales demo — seeded leads, simulated
+2:47 AM clock, break-it button — is intact: `NIGHTSHIFT_MODE=demo npm run dev`, or `/demo`
+on a live instance (behind login).
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    subgraph Channels
-        VM[Voicemail] & SMS[SMS] & WF[Web form] & WA[WhatsApp]
+    subgraph Inbound
+        TW[Twilio SMS / voicemail / WhatsApp] & WF[Hosted web form] & EM[Email parse]
     end
-    VM & SMS & WF & WA --> STORE[(data/store.json)]
-    STORE --> API["/api/process"]
-    API --> LLM["Claude (claude-sonnet-4-6)\nextraction + draft reply only"]
-    LLM -->|"strict JSON, zod-validated,\nretry once, cached fallback"| CODE[Application code]
-    CODE --> SOL["SOL deadline\nlib/sol-table.ts + date math"]
-    CODE --> CONF["Conflict check\ndata/adverse-parties.json"]
-    CODE --> REV["Forced human review\nlow confidence / conflict / sign-now"]
-    SOL & CONF & REV --> CF[CaseFile]
-    CF --> UI["Live Desk · Case File · Activity log"]
-    CF --> REPLY["Draft reply + firm disclaimer\n(appended by code)"]
-    REPLY --> HUMAN{{"Human clicks Send"}}
+    TW & WF & EM -->|verified webhooks, idempotent| DB[(SQLite · Drizzle)]
+    DB --> Q[Job queue - retries, backoff, dead-letter]
+    Q --> LLM["Claude (claude-sonnet-4-6)\nextraction + draft only"]
+    LLM -->|strict JSON, zod, retry once| CODE[Application code]
+    CODE --> SOL["SOL: reviewed table + date math\n(hidden until attorney acknowledges)"]
+    CODE --> CONF["Conflict check vs firm's list"]
+    CODE --> REV["Forced human review:\nlow confidence / conflict / sign-now"]
+    SOL & CONF & REV --> UI["Inbox → review screen\n(editable draft, edits audited)"]
+    UI --> HUMAN{{"Human approves"}}
+    HUMAN --> OUT["Outbound: Twilio / SendGrid\n(SIMULATED until creds exist)"]
+    DB -.-> AUDIT[(Append-only audit trail)]
 ```
 
-The trust boundary is the point of the design: the model **extracts**; code **decides**. Three fields are never model output:
+**The trust boundary is the product.** The model extracts and drafts; code decides:
 
-- `statuteOfLimitations` — computed from a reviewed table (`lib/sol-table.ts`) plus date arithmetic
-- `conflictFlags` — name-matched against `data/adverse-parties.json`
-- `needsHumanReview` — forced `true` on confidence < 0.7, any conflict, or a sign-now routing
+- `statuteOfLimitations` — computed from `lib/sol-table.ts` + date arithmetic, and hidden
+  from reviewers until an attorney reviews the table and acknowledges it in Settings
+- `conflictFlags` — matched against the firm-managed conflict list; a match holds the
+  reply and requires an admin to release it
+- `needsHumanReview` — forced on low confidence, any conflict, or a sign-now routing
+- **Nothing sends itself.** Every outbound reply is a human clicking Approve on the review
+  screen; the reviewer can edit the draft first, and the edit is audited
+- **Real leads never get canned answers.** If extraction fails after retries, the lead is
+  flagged `needs attention` with the raw message — the demo's cached fallbacks exist only
+  in demo mode
+- Unconfigured channels run **visibly simulated** — the pipeline works end to end, marked
+  "simulated" instead of pretending to deliver
+- Every consequential action — machine or human — lands in an append-only audit trail
 
 ## The CaseFile schema
 
@@ -75,18 +95,26 @@ interface CaseFile {
 }
 ```
 
-Model output is parsed defensively (`lib/extract.ts`): fences stripped, outermost JSON object extracted, zod-validated. A failed parse retries once with the validation error fed back; a second failure falls back to a cached pre-computed result for that lead (logged to the console, never surfaced in the UI).
+## Tests
 
-## Demo controls
+```bash
+npx vitest run     # parser, SOL math, conflict matching, review forcing, reply routing
+```
 
-Floating bar (keyboard-accessible): **Reset** (`R`) wipes all processed state, restores seeds, and resets the clock to 2:47 AM · **Run all** (`A`) · **Run one** (`N`) · **Conflict lead** (`C`) · **Break it** (`B`) injects a lead with a malformed date so the parser genuinely fails and the retry genuinely recovers · clock speed `1` / `3` / `6` (1×, 3×, and a 60× cold-open speed that carries the clock from 2:47 to the 3:12 AM voicemail in 25 seconds).
+## This is intake software, not legal software
 
-## This is a demo, not legal software
-
-- **The SOL table is illustrative.** `lib/sol-table.ts` contains simplified limitations periods for a handful of states and ignores discovery rules, tolling, municipal notice-of-claim deadlines, and every other exception that makes this an attorney's job. It exists to demonstrate an architecture — deadlines from reviewed tables and date math, never from a language model. Verify anything real against official sources.
-- **No legal advice, by construction.** The system prompt (shown verbatim on the Guardrails screen, imported from `lib/guardrails.ts`) forbids legal advice, case-value estimates, and any implication that an attorney-client relationship exists. The disclaimer on every draft reply is appended by application code — the model never controls it.
-- **A human approves everything.** Nothing is signed or sent by the system. Sign-now routings, conflicts, and low-confidence extractions are force-flagged for review, and the Send button is a person.
-- All names, parties, and matters in the seed data are fictional.
+- **The SOL table ships as illustrative data.** `lib/sol-table.ts` ignores discovery
+  rules, tolling, municipal notice-of-claim deadlines, and every exception that makes
+  deadlines an attorney's job. The product enforces this honestly: deadline countdowns
+  stay hidden until an attorney reviews the table and acknowledges it in Settings —
+  and verifying it against current law is that attorney's responsibility, per release.
+- **No legal advice, by construction.** The system prompt (rendered verbatim on the
+  Guardrails screen from `lib/guardrails.ts`) forbids legal advice, case-value estimates,
+  and any implication of an attorney-client relationship. The disclaimer on every reply is
+  appended by application code in the sender's language.
+- **A human approves everything**, and the audit trail proves who approved what, when,
+  edited or not.
+- Names, parties, and matters in the demo seed data are fictional.
 
 ## License
 

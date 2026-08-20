@@ -49,3 +49,8 @@ next-env.d.ts
 # generated agent docs
 AGENTS.md
 CLAUDE.md
+
+# sqlite instance data
+/data/*.db
+/data/*.db-*
+/data/backup-*.db

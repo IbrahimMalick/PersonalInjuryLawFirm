@@ -200,7 +200,7 @@ export default async function LeadReview({ params }: { params: Promise<{ id: str
                     <div>
                       <span className="text-dim">Other party · </span>
                       {cf.otherPartyInfo.name ?? "unknown"}
-                      {cf.otherPartyInfo.insurer ? ` (${cf.otherPartyInfo.insurer})` : ""}
+                      {cf.otherPartyInfo.insurer ? ` · ${cf.otherPartyInfo.insurer}` : ""}
                     </div>
                     <div>
                       <span className="text-dim">Confidence · </span>
