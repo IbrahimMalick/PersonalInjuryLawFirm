@@ -22,7 +22,9 @@ async function handle(job: JobRow): Promise<void> {
       await runSendMessage(Number(job.payload.messageId));
       break;
     case "transcribe_voicemail":
-      await runTranscribeVoicemail(job.payload as { callSid: string; recordingUrl: string });
+      await runTranscribeVoicemail(
+        job.payload as { firmId: number; callSid: string; recordingUrl: string }
+      );
       break;
   }
 }

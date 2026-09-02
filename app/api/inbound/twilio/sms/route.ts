@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
-import { handleInboundSms, verifyTwilioSignature } from "@/lib/channels/twilio";
+import {
+  firmForTwilioNumber,
+  handleInboundSms,
+  verifyTwilioSignature,
+} from "@/lib/channels/twilio";
 
 export const dynamic = "force-dynamic";
+
+const EMPTY_TWIML = `<?xml version="1.0" encoding="UTF-8"?><Response/>`;
 
 async function formParams(request: Request): Promise<Record<string, string>> {
   const form = await request.formData();
@@ -17,9 +23,12 @@ export async function POST(request: Request) {
   if (!(await verifyTwilioSignature(request, params))) {
     return new NextResponse("invalid signature", { status: 403 });
   }
-  await handleInboundSms(params);
+  const firm = await firmForTwilioNumber(params.To);
+  if (!firm) {
+    console.warn(`[twilio] SMS to unrouted number ${params.To} — dropped`);
+    return new NextResponse(EMPTY_TWIML, { headers: { "Content-Type": "text/xml" } });
+  }
+  await handleInboundSms(firm, params);
   // Empty TwiML: the auto-reply comes later, after AI triage + human approval.
-  return new NextResponse(`<?xml version="1.0" encoding="UTF-8"?><Response/>`, {
-    headers: { "Content-Type": "text/xml" },
-  });
+  return new NextResponse(EMPTY_TWIML, { headers: { "Content-Type": "text/xml" } });
 }

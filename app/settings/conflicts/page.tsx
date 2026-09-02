@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import AppShell from "@/components/product/AppShell";
 import { audit } from "@/lib/audit";
-import { requireUser } from "@/lib/auth";
+import { requireFirmUser } from "@/lib/auth";
 import { getDb, tables } from "@/lib/db";
 import { isDemo } from "@/lib/mode";
 
@@ -16,26 +16,28 @@ export const dynamic = "force-dynamic";
 
 async function addParty(formData: FormData): Promise<void> {
   "use server";
-  const user = await requireUser("admin");
+  const { user, firm } = await requireFirmUser("admin");
   const name = String(formData.get("name") ?? "").trim();
   const relationship = String(formData.get("relationship") ?? "").trim();
   if (!name || !relationship) redirect("/settings/conflicts?error=1");
   const db = await getDb();
-  await db.insert(tables.adverseParties).values({ name, relationship, createdBy: user.id });
-  await audit("settings.conflict_party_added", { userId: user.id, detail: { name } });
+  await db
+    .insert(tables.adverseParties)
+    .values({ firmId: firm.id, name, relationship, createdBy: user.id });
+  await audit("settings.conflict_party_added", { firmId: firm.id, userId: user.id, detail: { name } });
   revalidatePath("/settings/conflicts");
 }
 
 async function deactivateParty(formData: FormData): Promise<void> {
   "use server";
-  const user = await requireUser("admin");
+  const { user, firm } = await requireFirmUser("admin");
   const id = Number(formData.get("id"));
   const db = await getDb();
   await db
     .update(tables.adverseParties)
     .set({ active: false })
-    .where(eq(tables.adverseParties.id, id));
-  await audit("settings.conflict_party_deactivated", { userId: user.id, detail: { id } });
+    .where(and(eq(tables.adverseParties.id, id), eq(tables.adverseParties.firmId, firm.id)));
+  await audit("settings.conflict_party_deactivated", { firmId: firm.id, userId: user.id, detail: { id } });
   revalidatePath("/settings/conflicts");
 }
 
@@ -45,11 +47,12 @@ export default async function ConflictsPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   if (isDemo()) redirect("/demo");
-  const user = await requireUser("admin");
+  const { user, firm } = await requireFirmUser("admin");
   const db = await getDb();
   const parties = await db
     .select()
     .from(tables.adverseParties)
+    .where(eq(tables.adverseParties.firmId, firm.id))
     .orderBy(desc(tables.adverseParties.active), desc(tables.adverseParties.id));
   const { error } = await searchParams;
 
@@ -57,7 +60,7 @@ export default async function ConflictsPage({
     "w-full rounded-sm border border-ink-line bg-ink px-3 py-2 text-[15px] text-inktext focus:outline focus:outline-2 focus:outline-meter";
 
   return (
-    <AppShell user={user}>
+    <AppShell user={user} firm={firm}>
       <div className="px-6 pt-4 pb-10 max-w-[900px] mx-auto">
         <div className="flex items-center justify-between pb-3">
           <h1 className="font-display font-bold uppercase tracking-wide text-2xl text-paper">

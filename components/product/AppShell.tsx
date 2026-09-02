@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { destroySession, requireUser } from "@/lib/auth";
+import { and, eq, inArray, notInArray } from "drizzle-orm";
+import { destroySession, isOperator } from "@/lib/auth";
 import type { FirmRow, UserRow } from "@/lib/db/schema";
-import { getFirm } from "@/lib/firm";
 import { getDb, tables } from "@/lib/db";
-import { and, eq, inArray, isNull, notInArray, sql } from "drizzle-orm";
 import RealMeter from "./RealMeter";
 import NavTabs from "./NavTabs";
 
@@ -22,18 +21,27 @@ function initials(name: string): string {
     .join("·");
 }
 
-/** Oldest inquiry with no outbound reply yet — the real-life meter. */
-async function oldestUnanswered(): Promise<string | null> {
+/** Oldest inquiry AT THIS FIRM with no outbound reply yet — the meter. */
+async function oldestUnanswered(firmId: number): Promise<string | null> {
   const db = await getDb();
   const replied = db
     .select({ leadId: tables.messages.leadId })
     .from(tables.messages)
-    .where(inArray(tables.messages.status, ["queued", "sent", "simulated"]));
+    .where(
+      and(
+        eq(tables.messages.firmId, firmId),
+        inArray(tables.messages.status, ["queued", "sent", "simulated"])
+      )
+    );
   const rows = await db
     .select({ receivedAt: tables.leads.receivedAt })
     .from(tables.leads)
     .where(
-      and(notInArray(tables.leads.status, ["archived"]), notInArray(tables.leads.id, replied))
+      and(
+        eq(tables.leads.firmId, firmId),
+        notInArray(tables.leads.status, ["archived"]),
+        notInArray(tables.leads.id, replied)
+      )
     )
     .orderBy(tables.leads.receivedAt)
     .limit(1);
@@ -42,14 +50,14 @@ async function oldestUnanswered(): Promise<string | null> {
 
 export default async function AppShell({
   children,
-  user: userProp,
+  user,
+  firm,
 }: {
   children: React.ReactNode;
-  user?: UserRow;
+  user: UserRow;
+  firm: FirmRow;
 }) {
-  const user = userProp ?? (await requireUser());
-  const firm: FirmRow = await getFirm();
-  const oldest = await oldestUnanswered();
+  const oldest = await oldestUnanswered(firm.id);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -76,7 +84,7 @@ export default async function AppShell({
           <RealMeter oldestReceivedAt={oldest} timezone={firm.timezone} />
         </div>
         <div className="self-end flex items-end gap-4">
-          <NavTabs isAdmin={user.role === "admin"} />
+          <NavTabs isAdmin={user.role === "admin"} isOperator={isOperator(user)} />
         </div>
       </header>
       <div className="flex items-center justify-end gap-3 px-6 py-1.5 border-b border-ink-line bg-ink-raised/50">

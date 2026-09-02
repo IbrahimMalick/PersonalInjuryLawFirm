@@ -1,21 +1,28 @@
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { ingestLead } from "@/lib/channels/inbound";
+import { getDb, tables } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-// SendGrid Inbound Parse posts multipart form data here. The URL carries a
-// shared secret (?token=...) — configure the same value in SendGrid and in
-// EMAIL_INBOUND_TOKEN. Requests without it are rejected.
+// SendGrid Inbound Parse posts multipart form data here. The URL carries the
+// FIRM'S token (?token=...) — each firm gets its own, shown in Settings, so
+// the token both authenticates the webhook and routes to the tenant.
 
 export async function POST(request: Request) {
-  const token = process.env.EMAIL_INBOUND_TOKEN;
-  if (!token) {
-    return NextResponse.json({ error: "Email intake not configured" }, { status: 503 });
-  }
   const url = new URL(request.url);
-  if (url.searchParams.get("token") !== token) {
-    return new NextResponse("forbidden", { status: 403 });
-  }
+  const token = url.searchParams.get("token") ?? "";
+  if (!token) return new NextResponse("forbidden", { status: 403 });
+
+  const db = await getDb();
+  const firm = (
+    await db
+      .select()
+      .from(tables.firms)
+      .where(eq(tables.firms.emailInboundToken, token))
+      .limit(1)
+  )[0];
+  if (!firm) return new NextResponse("forbidden", { status: 403 });
 
   const form = await request.formData();
   const get = (k: string) => {
@@ -30,11 +37,11 @@ export async function POST(request: Request) {
   const subject = get("subject");
   const text = get("text") || get("html").replace(/<[^>]+>/g, " ");
 
-  // Message-ID header for idempotency when available.
   const headers = get("headers");
   const messageId = headers.match(/^Message-ID:\s*<([^>]+)>/im)?.[1];
 
   await ingestLead({
+    firmId: firm.id,
     channel: "email",
     externalId: messageId,
     fromAddress,

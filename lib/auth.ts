@@ -69,20 +69,37 @@ export async function currentUser(): Promise<UserRow | null> {
   return rows[0]?.user ?? null;
 }
 
-/** True once the first admin has been created (i.e., setup is complete). */
-export async function isConfigured(): Promise<boolean> {
-  const db = await getDb();
-  const anyUser = await db.select({ id: tables.users.id }).from(tables.users).limit(1);
-  return anyUser.length > 0;
-}
-
-/** Page guard: redirects to /setup or /login as needed. */
+/** Page guard: redirects to /login as needed. */
 export async function requireUser(role?: "admin"): Promise<UserRow> {
-  if (!(await isConfigured())) redirect("/setup");
   const user = await currentUser();
   if (!user) redirect("/login");
   if (role === "admin" && user.role !== "admin") redirect("/");
   return user;
+}
+
+/** Page guard that also loads the user's firm — the common multi-tenant path. */
+export async function requireFirmUser(
+  role?: "admin"
+): Promise<{ user: UserRow; firm: import("./db/schema").FirmRow }> {
+  const user = await requireUser(role);
+  const db = await getDb();
+  const firm = (
+    await db.select().from(tables.firms).where(eq(tables.firms.id, user.firmId)).limit(1)
+  )[0];
+  if (!firm) redirect("/login"); // orphaned account — shouldn't happen
+  return { user, firm };
+}
+
+/**
+ * Platform operators (us): normal accounts whose email is allowlisted in
+ * OPERATOR_EMAILS. Gates the /operator console used for onboarding firms.
+ */
+export function isOperator(user: UserRow): boolean {
+  const list = (process.env.OPERATOR_EMAILS ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  return list.includes(user.email.toLowerCase());
 }
 
 /** Route-handler guard: returns null instead of redirecting. */

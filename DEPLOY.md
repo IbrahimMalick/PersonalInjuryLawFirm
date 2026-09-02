@@ -1,16 +1,23 @@
 # Deploying Nightshift
 
-One instance = one firm. Each deployment carries its own SQLite database on a
-persistent volume — total data isolation between firms by construction.
-Requires a **long-running Node process** (the background worker runs inside
-the web process), so any Docker host works; serverless does not.
+**One deployment serves every firm.** Attorneys self-serve at `/signup`;
+every row is scoped by firm id and every query enforces it (two-firm
+isolation is covered by the E2E checks). Your team's accounts, allowlisted in
+`OPERATOR_EMAILS`, get the `/operator` console for onboarding and phone-number
+provisioning. Requires a **long-running Node process** (the background worker
+runs inside the web process), so any Docker host works; serverless does not.
+
+Storage is a single SQLite file behind Drizzle — right for one app server and
+early-stage firm counts, with Litestream for continuous replication. Swap to
+Postgres (Drizzle dialect change + regenerated migrations) when you need a
+second app server or managed point-in-time recovery.
 
 ## Local / development
 
 ```bash
 npm install
 cp .env.example .env.local     # add ANTHROPIC_API_KEY
-npm run dev                    # http://localhost:3000 → first-run /setup
+npm run dev                    # http://localhost:3000 → /signup
 ```
 
 Run the sales demo instead with `NIGHTSHIFT_MODE=demo npm run dev`.
@@ -25,51 +32,54 @@ docker compose up -d --build
 Put a TLS proxy (Caddy/Traefik/nginx) in front and set `PUBLIC_BASE_URL` to
 the public https URL — Twilio signature verification depends on it.
 
-## Fly.io (per-firm apps)
+## Fly.io
 
 ```bash
-fly launch --no-deploy --name nightshift-<firm>   # generates fly.toml from the Dockerfile
-fly volumes create nightshift_data --size 1
+fly launch --no-deploy --name nightshift
+fly volumes create nightshift_data --size 3
 # in fly.toml: [mounts] source="nightshift_data" destination="/data"
-# and: [env] PUBLIC_BASE_URL="https://nightshift-<firm>.fly.dev"
-fly secrets set ANTHROPIC_API_KEY=... TWILIO_ACCOUNT_SID=... TWILIO_AUTH_TOKEN=... TWILIO_PHONE_NUMBER=...
+# and: [env] PUBLIC_BASE_URL="https://your-domain.com"
+fly secrets set ANTHROPIC_API_KEY=... OPERATOR_EMAILS=... TWILIO_ACCOUNT_SID=... TWILIO_AUTH_TOKEN=...
 fly deploy
+fly scale count 1   # REQUIRED: single SQLite writer + in-process worker
 ```
 
-Keep exactly **one machine** per app (single SQLite writer + in-process
-worker): `fly scale count 1`.
+## Platform setup (you, once)
 
-## First run
+1. Deploy, then sign up your own team's accounts at `/signup` (any firm name —
+   e.g. "Nightshift HQ") using the emails listed in `OPERATOR_EMAILS`.
+2. Open `/operator` — every firm that signs up appears here with what's left
+   to get them live.
+3. Create the platform Twilio account and SendGrid account once; per-firm
+   numbers are provisioned as firms onboard.
 
-Open the instance → `/setup` creates the firm identity and the first admin.
-Then in **Settings**:
+## Firm onboarding (per firm — self-serve + hand-holding)
 
-1. Fill in the letterhead details and timezone.
-2. Load the firm's **conflict list** (current clients + adverse parties).
-3. Review `lib/sol-table.ts` against current law for the firm's states and
-   click the **deadline-table acknowledgment** — countdowns stay hidden from
-   reviewers until an attorney does.
-4. Wire channels (below). Until then, approvals run visibly **simulated**.
+A firm signs up at `/signup` and immediately has a working intake form at
+`/intake/<their-slug>` — that's the "start working in two minutes" path. The
+inbox shows them a checklist for the rest; on the onboarding call you do
+together:
 
-## Channels
+1. **Conflict list** — load current clients + adverse parties in their Settings.
+2. **Deadline table** — an attorney at the firm reviews `lib/sol-table.ts`
+   against current law and clicks the acknowledgment (countdowns stay hidden
+   from their reviewers until then).
+3. **Phone number** — buy a number in the platform Twilio account, point its
+   webhooks (below), then paste the number into their row in `/operator`.
+   Inbound routes to the firm by the number dialed; their approved replies
+   send from it. The firm forwards their office line to it after hours.
+4. **Email** — configure SendGrid Inbound Parse for their intake address to
+   `{PUBLIC_BASE_URL}/api/inbound/email?token=<their per-firm token>` (shown
+   in `/operator` and their Settings).
+5. **Team** — they add reviewers in Settings.
 
-**Web form** — live immediately at `PUBLIC_BASE_URL/intake`. Link the firm
-site's "Contact us" button to it.
+## Twilio webhooks (same URLs for every number)
 
-**Twilio (SMS + voicemail + WhatsApp)** — buy a number, set env vars
-(`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`), then in
-the Twilio console point the number at:
-
-- Messaging webhook → `POST {PUBLIC_BASE_URL}/api/inbound/twilio/sms`
-- Voice webhook → `POST {PUBLIC_BASE_URL}/api/inbound/twilio/voice`
+- Messaging → `POST {PUBLIC_BASE_URL}/api/inbound/twilio/sms`
+- Voice → `POST {PUBLIC_BASE_URL}/api/inbound/twilio/voice`
 
 WhatsApp rides the same Twilio account once Meta business verification
 completes (weeks of lead time — start early).
-
-**Email** — set `SENDGRID_API_KEY`, `EMAIL_FROM_ADDRESS`, and a long random
-`EMAIL_INBOUND_TOKEN`; configure SendGrid Inbound Parse for the firm's intake
-address to POST to
-`{PUBLIC_BASE_URL}/api/inbound/email?token=<EMAIL_INBOUND_TOKEN>`.
 
 ## Backups
 
@@ -88,9 +98,11 @@ replication, [Litestream](https://litestream.io) pointed at
 
 - [ ] `PUBLIC_BASE_URL` set, TLS terminated in front
 - [ ] `ANTHROPIC_API_KEY` set (send one test lead through `/intake`, watch it triage)
-- [ ] Conflict list loaded; add a fake test entry, send a matching lead, watch the hold fire, then remove it
-- [ ] SOL table reviewed by an attorney and acknowledged in Settings
-- [ ] Twilio webhooks pointed and a real test call + text made end to end
-- [ ] Reply approved from the review screen arrives on a real phone
+- [ ] `OPERATOR_EMAILS` set; `/operator` reachable by your team only
+- [ ] Signed up a test firm; verified another account cannot see its leads
+- [ ] Conflict list loaded; a matching test lead fires the hold
+- [ ] SOL table reviewed by an attorney at the firm and acknowledged
+- [ ] Twilio webhooks pointed; a real test call + text lands in the right firm's inbox
+- [ ] Reply approved from the review screen arrives on a real phone, from the firm's number
 - [ ] Backup cron in place and one restore actually tested
 - [ ] Firm staff added as reviewers; passwords rotated from the temp ones

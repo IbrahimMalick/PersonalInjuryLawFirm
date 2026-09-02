@@ -1,9 +1,9 @@
 import { eq } from "drizzle-orm";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { audit } from "@/lib/audit";
-import { createSession, isConfigured, verifyPassword } from "@/lib/auth";
+import { createSession, verifyPassword } from "@/lib/auth";
 import { getDb, tables } from "@/lib/db";
-import { getFirm } from "@/lib/firm";
 
 export const dynamic = "force-dynamic";
 
@@ -19,10 +19,10 @@ async function login(formData: FormData): Promise<void> {
   const ok =
     user && !user.disabledAt ? await verifyPassword(password, user.passwordHash) : false;
   if (!ok || !user) {
-    await audit("login.failed", { detail: { email } });
+    await audit("login.failed", { firmId: user?.firmId ?? null, detail: { email } });
     redirect("/login?error=1");
   }
-  await audit("login.succeeded", { userId: user.id });
+  await audit("login.succeeded", { firmId: user.firmId, userId: user.id });
   await createSession(user.id);
   redirect("/");
 }
@@ -32,8 +32,6 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  if (!(await isConfigured())) redirect("/setup");
-  const firm = await getFirm();
   const { error } = await searchParams;
 
   const input =
@@ -46,17 +44,13 @@ export default async function LoginPage({
         className="w-full max-w-sm rounded-sm border border-ink-line bg-ink-raised px-7 py-6 space-y-4"
       >
         <div className="text-center">
-          <div className="mx-auto w-10 h-10 grid place-items-center border-2 border-manila text-manila rounded-sm font-display font-bold text-lg mb-2">
-            {firm.name
-              .split(/\s+/)
-              .map((w) => w[0])
-              .slice(0, 2)
-              .join("·")}
+          <div className="mx-auto w-10 h-10 grid place-items-center border-2 border-meter text-meter rounded-sm font-display font-bold text-lg mb-2">
+            N
           </div>
           <h1 className="font-display font-bold text-xl uppercase tracking-widest text-paper">
-            {firm.name}
+            Nightshift
           </h1>
-          <p className="field-label text-dim mt-1">Nightshift intake · sign in</p>
+          <p className="field-label text-dim mt-1">Intake desk · sign in</p>
         </div>
         {error && (
           <p className="text-stamp text-sm border border-stamp/50 rounded-sm px-3 py-2">
@@ -83,6 +77,12 @@ export default async function LoginPage({
         >
           Sign in
         </button>
+        <p className="text-center text-sm text-dim">
+          New firm?{" "}
+          <Link href="/signup" className="text-manila underline underline-offset-4">
+            Create your desk in two minutes
+          </Link>
+        </p>
       </form>
     </div>
   );

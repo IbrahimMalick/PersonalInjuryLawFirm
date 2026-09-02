@@ -1,4 +1,4 @@
-import type { MessageRow } from "../db/schema";
+import type { FirmRow, MessageRow } from "../db/schema";
 
 // Outbound senders. Each channel sends for real when its credentials are
 // configured, and otherwise runs in SIMULATED mode: the message is marked
@@ -12,17 +12,22 @@ export interface SendOutcome {
   error?: string;
 }
 
-function twilioConfigured(): boolean {
+function twilioConfigured(fromNumber: string | null): fromNumber is string {
   return Boolean(
-    process.env.TWILIO_ACCOUNT_SID &&
-      process.env.TWILIO_AUTH_TOKEN &&
-      process.env.TWILIO_PHONE_NUMBER
+    process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && fromNumber
   );
 }
 
-async function sendSms(to: string, body: string, whatsapp = false): Promise<SendOutcome> {
-  if (!twilioConfigured()) {
-    console.warn(`[nightshift] Twilio not configured — SIMULATED ${whatsapp ? "WhatsApp" : "SMS"} to ${to}`);
+async function sendSms(
+  fromNumber: string | null,
+  to: string,
+  body: string,
+  whatsapp = false
+): Promise<SendOutcome> {
+  if (!twilioConfigured(fromNumber)) {
+    console.warn(
+      `[nightshift] Twilio not configured for this firm — SIMULATED ${whatsapp ? "WhatsApp" : "SMS"} to ${to}`
+    );
     return { status: "simulated" };
   }
   const { default: twilio } = await import("twilio");
@@ -30,7 +35,7 @@ async function sendSms(to: string, body: string, whatsapp = false): Promise<Send
   const prefix = whatsapp ? "whatsapp:" : "";
   try {
     const message = await client.messages.create({
-      from: `${prefix}${process.env.TWILIO_PHONE_NUMBER}`,
+      from: `${prefix}${fromNumber}`,
       to: `${prefix}${to}`,
       body,
     });
@@ -72,13 +77,14 @@ async function sendEmail(to: string, body: string, subject: string): Promise<Sen
   }
 }
 
-export async function sendViaChannel(message: MessageRow): Promise<SendOutcome> {
+export async function sendViaChannel(message: MessageRow, firm: FirmRow): Promise<SendOutcome> {
+  const fromNumber = firm.twilioNumber ?? process.env.TWILIO_PHONE_NUMBER ?? null;
   switch (message.channel) {
     case "sms":
     case "voicemail": // reply to a voicemail goes back as SMS to the caller
-      return sendSms(message.toAddress, message.body);
+      return sendSms(fromNumber, message.toAddress, message.body);
     case "whatsapp":
-      return sendSms(message.toAddress, message.body, true);
+      return sendSms(fromNumber, message.toAddress, message.body, true);
     case "email":
     case "webform": // webform replies go to the email captured on the form
       return sendEmail(message.toAddress, message.body, "Following up on your inquiry");
@@ -87,10 +93,11 @@ export async function sendViaChannel(message: MessageRow): Promise<SendOutcome> 
   }
 }
 
-/** Channel configuration status for the settings screen. */
-export function channelStatus() {
+/** Channel configuration status for a firm's settings screen. */
+export function channelStatus(firm: FirmRow) {
   return {
-    twilio: twilioConfigured(),
+    twilio: twilioConfigured(firm.twilioNumber ?? process.env.TWILIO_PHONE_NUMBER ?? null),
+    twilioNumber: firm.twilioNumber,
     email: emailConfigured(),
     webform: true, // always on — served by this app itself
   };

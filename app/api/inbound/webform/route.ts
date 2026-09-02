@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ingestLead } from "@/lib/channels/inbound";
+import { getFirmBySlug } from "@/lib/firm";
 
 export const dynamic = "force-dynamic";
 
@@ -22,14 +23,18 @@ function rateLimited(ip: string): boolean {
 }
 
 export async function POST(request: Request) {
-  const wantsRedirect = new URL(request.url).searchParams.get("redirect") === "1";
+  const url = new URL(request.url);
+  const wantsRedirect = url.searchParams.get("redirect") === "1";
+  const slug = url.searchParams.get("firm") ?? "";
+  const firm = await getFirmBySlug(slug);
+  if (!firm) return NextResponse.json({ error: "Unknown firm" }, { status: 404 });
   const done = () =>
     wantsRedirect
-      ? NextResponse.redirect(new URL("/intake?sent=1", request.url), 303)
+      ? NextResponse.redirect(new URL(`/intake/${firm.slug}?sent=1`, request.url), 303)
       : NextResponse.json({ ok: true });
 
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (rateLimited(ip)) {
+  if (rateLimited(`${firm.id}:${ip}`)) {
     return NextResponse.json({ error: "Too many submissions" }, { status: 429 });
   }
 
@@ -74,6 +79,7 @@ export async function POST(request: Request) {
   ].join("\n");
 
   await ingestLead({
+    firmId: firm.id,
     channel: "webform",
     fromAddress: email || phone || "webform",
     displayName: [firstName, lastName].filter(Boolean).join(" ") || null,

@@ -3,9 +3,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import AppShell from "@/components/product/AppShell";
 import ReviewPanel from "@/components/product/ReviewPanel";
-import { requireUser } from "@/lib/auth";
+import { requireFirmUser } from "@/lib/auth";
 import { getDb, tables } from "@/lib/db";
-import { getFirm } from "@/lib/firm";
 import { fmtDateTime } from "@/lib/format";
 import { disclaimerFor } from "@/lib/guardrails";
 import {
@@ -26,13 +25,12 @@ const EMAIL_CHANNEL_LABELS: Record<string, string> = { ...CHANNEL_LABEL, email: 
 
 export default async function LeadReview({ params }: { params: Promise<{ id: string }> }) {
   if (isDemo()) redirect("/demo");
-  const user = await requireUser();
+  const { user, firm } = await requireFirmUser();
   const { id } = await params;
   const db = await getDb();
-  const firm = await getFirm();
 
   const lead = (await db.select().from(tables.leads).where(eq(tables.leads.id, id)).limit(1))[0];
-  if (!lead) notFound();
+  if (!lead || lead.firmId !== firm.id) notFound();
 
   const [message] = await db
     .select()
@@ -56,7 +54,7 @@ export default async function LeadReview({ params }: { params: Promise<{ id: str
   const solAcknowledged = Boolean(firm.solAcknowledgedAt);
 
   return (
-    <AppShell user={user}>
+    <AppShell user={user} firm={firm}>
       <div className="px-6 pt-4 pb-8 max-w-[1360px] mx-auto">
         <div className="flex items-center justify-between pb-3">
           <Link href="/" className="field-label text-dim hover:text-inktext">

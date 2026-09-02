@@ -1,55 +1,61 @@
+import { eq } from "drizzle-orm";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import AppShell from "@/components/product/AppShell";
 import { audit } from "@/lib/audit";
-import { hashPassword, requireUser } from "@/lib/auth";
+import { hashPassword, requireFirmUser } from "@/lib/auth";
 import { channelStatus } from "@/lib/channels/outbound";
 import { getDb, tables } from "@/lib/db";
-import { getFirm, updateFirm } from "@/lib/firm";
+import { updateFirm } from "@/lib/firm";
 import { isDemo } from "@/lib/mode";
 
 export const dynamic = "force-dynamic";
 
 async function saveFirm(formData: FormData): Promise<void> {
   "use server";
-  const user = await requireUser("admin");
-  await updateFirm({
-    name: String(formData.get("name") ?? "").trim() || "Your Firm",
+  const { user, firm } = await requireFirmUser("admin");
+  await updateFirm(firm.id, {
+    name: String(formData.get("name") ?? "").trim() || firm.name,
     practiceLine: String(formData.get("practiceLine") ?? "").trim(),
     addressLine: String(formData.get("addressLine") ?? "").trim(),
     phone: String(formData.get("phone") ?? "").trim(),
     timezone: String(formData.get("timezone") ?? "America/New_York").trim(),
   });
-  await audit("settings.firm_updated", { userId: user.id });
+  await audit("settings.firm_updated", { firmId: firm.id, userId: user.id });
   revalidatePath("/settings");
 }
 
 async function acknowledgeSol(): Promise<void> {
   "use server";
-  const user = await requireUser("admin");
-  await updateFirm({
+  const { user, firm } = await requireFirmUser("admin");
+  await updateFirm(firm.id, {
     solAcknowledgedAt: new Date().toISOString(),
     solAcknowledgedBy: user.id,
   });
-  await audit("settings.sol_acknowledged", { userId: user.id });
+  await audit("settings.sol_acknowledged", { firmId: firm.id, userId: user.id });
   revalidatePath("/settings");
 }
 
 async function addUser(formData: FormData): Promise<void> {
   "use server";
-  const admin = await requireUser("admin");
+  const { user: admin, firm } = await requireFirmUser("admin");
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const name = String(formData.get("name") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const role = formData.get("role") === "admin" ? "admin" : "reviewer";
   if (!email.includes("@") || !name || password.length < 10) redirect("/settings?userError=1");
   const db = await getDb();
+  const existing = await db
+    .select({ id: tables.users.id })
+    .from(tables.users)
+    .where(eq(tables.users.email, email))
+    .limit(1);
+  if (existing[0]) redirect("/settings?userError=2");
   await db
     .insert(tables.users)
-    .values({ email, name, passwordHash: await hashPassword(password), role })
-    .onConflictDoNothing();
-  await audit("settings.user_added", { userId: admin.id, detail: { email, role } });
+    .values({ firmId: firm.id, email, name, passwordHash: await hashPassword(password), role });
+  await audit("settings.user_added", { firmId: firm.id, userId: admin.id, detail: { email, role } });
   revalidatePath("/settings");
 }
 
@@ -59,11 +65,10 @@ export default async function SettingsPage({
   searchParams: Promise<{ userError?: string }>;
 }) {
   if (isDemo()) redirect("/demo");
-  const user = await requireUser("admin");
-  const firm = await getFirm();
+  const { user, firm } = await requireFirmUser("admin");
   const db = await getDb();
-  const users = await db.select().from(tables.users);
-  const channels = channelStatus();
+  const users = await db.select().from(tables.users).where(eq(tables.users.firmId, firm.id));
+  const channels = channelStatus(firm);
   const { userError } = await searchParams;
   const base = process.env.PUBLIC_BASE_URL ?? "https://<your-domain>";
 
@@ -73,7 +78,7 @@ export default async function SettingsPage({
   const h2 = "font-display font-bold uppercase tracking-wide text-lg text-paper pb-2";
 
   return (
-    <AppShell user={user}>
+    <AppShell user={user} firm={firm}>
       <div className="px-6 pt-4 pb-10 max-w-[1200px] mx-auto">
         <div className="flex items-center justify-between pb-3">
           <h1 className="font-display font-bold uppercase tracking-wide text-2xl text-paper">
@@ -122,13 +127,13 @@ export default async function SettingsPage({
             <div className={card}>
               <h2 className={h2}>Deadline table</h2>
               <p className="text-sm text-dim leading-snug">
-                Filing-deadline countdowns come from the reviewed table in{" "}
-                <span className="font-mono">lib/sol-table.ts</span> plus date math — never from
-                the model. The table ships as illustrative data:{" "}
+                Filing-deadline countdowns come from a reviewed table plus date math — never
+                from the model. The table ships as illustrative data:{" "}
                 <span className="text-inktext">
-                  an attorney must review it against current law and acknowledge it before
-                  deadlines are shown to reviewers.
-                </span>
+                  an attorney at your firm must review it against current law and acknowledge
+                  it before deadlines are shown to reviewers.
+                </span>{" "}
+                Ask us for the current table during onboarding — we&apos;ll walk it together.
               </p>
               {firm.solAcknowledgedAt ? (
                 <p className="field-label text-ok mt-3">
@@ -159,7 +164,9 @@ export default async function SettingsPage({
               </div>
               {userError && (
                 <p className="text-stamp text-sm pb-2">
-                  All fields required; password 10+ characters.
+                  {userError === "2"
+                    ? "That email already has an account."
+                    : "All fields required; password 10+ characters."}
                 </p>
               )}
               <form action={addUser} className="grid grid-cols-2 gap-2">
@@ -190,55 +197,51 @@ export default async function SettingsPage({
                 <div>
                   <div className="flex items-center justify-between">
                     <span className="text-inktext">Website intake form</span>
-                    <span className="field-label text-ok">LIVE</span>
+                    <span className="field-label text-ok">LIVE NOW</span>
                   </div>
                   <p className="font-mono text-sm text-dim mt-1 break-all">
-                    Hosted at {base}/intake — link your site&apos;s &ldquo;Contact us&rdquo;
-                    button to it.
+                    {base}/intake/{firm.slug}
+                  </p>
+                  <p className="text-sm text-dim mt-1">
+                    Link your site&apos;s &ldquo;Contact us&rdquo; button to it — works today,
+                    nothing to configure.
                   </p>
                 </div>
                 <div className="border-t border-ink-line pt-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-inktext">Phone — SMS, voicemail &amp; WhatsApp (Twilio)</span>
-                    <span className={`field-label ${channels.twilio ? "text-ok" : "text-meter"}`}>
-                      {channels.twilio ? "CONFIGURED" : "SIMULATED"}
+                    <span className="text-inktext">
+                      Phone — SMS, voicemail &amp; WhatsApp
+                    </span>
+                    <span className={`field-label ${channels.twilioNumber ? "text-ok" : "text-meter"}`}>
+                      {channels.twilioNumber ? `LIVE · ${channels.twilioNumber}` : "NOT YET SET UP"}
                     </span>
                   </div>
                   <p className="text-sm text-dim mt-1 leading-snug">
-                    Set <span className="font-mono">TWILIO_ACCOUNT_SID</span>,{" "}
-                    <span className="font-mono">TWILIO_AUTH_TOKEN</span>,{" "}
-                    <span className="font-mono">TWILIO_PHONE_NUMBER</span>. Point the number&apos;s
-                    webhooks at:
-                  </p>
-                  <p className="font-mono text-xs text-dim mt-1 break-all">
-                    SMS: {base}/api/inbound/twilio/sms
-                    <br />
-                    Voice: {base}/api/inbound/twilio/voice
+                    {channels.twilioNumber
+                      ? "Calls to this number are answered, recorded, transcribed, and triaged. Forward your office line to it after hours, or publish it directly."
+                      : "We provision a dedicated intake number for your firm during onboarding — book your setup call and we'll have it live the same day."}
                   </p>
                 </div>
                 <div className="border-t border-ink-line pt-3">
                   <div className="flex items-center justify-between">
                     <span className="text-inktext">Email intake</span>
-                    <span
-                      className={`field-label ${process.env.EMAIL_INBOUND_TOKEN ? "text-ok" : "text-meter"}`}
-                    >
-                      {process.env.EMAIL_INBOUND_TOKEN ? "CONFIGURED" : "OFF"}
+                    <span className={`field-label ${channels.email ? "text-ok" : "text-meter"}`}>
+                      {channels.email ? "AVAILABLE" : "NOT YET SET UP"}
                     </span>
                   </div>
                   <p className="text-sm text-dim mt-1 leading-snug">
-                    SendGrid Inbound Parse →{" "}
-                    <span className="font-mono break-all">
-                      {base}/api/inbound/email?token=&lt;EMAIL_INBOUND_TOKEN&gt;
-                    </span>
-                    . Outbound needs <span className="font-mono">SENDGRID_API_KEY</span> +{" "}
-                    <span className="font-mono">EMAIL_FROM_ADDRESS</span>.
+                    Forward your intake mailbox to the address we give you at onboarding —
+                    it&apos;s tied to this private token:
+                  </p>
+                  <p className="font-mono text-xs text-dim mt-1 break-all">
+                    …/api/inbound/email?token={firm.emailInboundToken.slice(0, 8)}…
                   </p>
                 </div>
               </div>
               <p className="text-sm text-dim mt-4 border-t border-ink-line pt-3 leading-snug">
-                Unconfigured channels run in <span className="text-meter">simulated</span> mode:
-                approvals work end to end and are marked &ldquo;simulated&rdquo; instead of
-                pretending to deliver.
+                Channels that aren&apos;t wired yet run in{" "}
+                <span className="text-meter">simulated</span> mode: approvals work end to end
+                and are marked &ldquo;simulated&rdquo; instead of pretending to deliver.
               </p>
             </div>
           </div>

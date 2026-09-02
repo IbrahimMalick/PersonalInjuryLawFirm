@@ -13,7 +13,9 @@ export async function POST(_request: Request, ctx: { params: Promise<{ id: strin
   const { id } = await ctx.params;
   const db = await getDb();
   const lead = (await db.select().from(tables.leads).where(eq(tables.leads.id, id)).limit(1))[0];
-  if (!lead) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!lead || lead.firmId !== user.firmId) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   if (lead.status === "archived") {
     return NextResponse.json({ error: "Archived leads can't be reprocessed" }, { status: 409 });
   }
@@ -21,7 +23,7 @@ export async function POST(_request: Request, ctx: { params: Promise<{ id: strin
     .update(tables.leads)
     .set({ status: "received", processingError: null })
     .where(eq(tables.leads.id, id));
-  await audit("lead.reprocess_requested", { leadId: id, userId: user.id });
+  await audit("lead.reprocess_requested", { firmId: lead.firmId, leadId: id, userId: user.id });
   await enqueue("process_lead", { leadId: id });
   return NextResponse.json({ ok: true });
 }

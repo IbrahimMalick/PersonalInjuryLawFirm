@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyTwilioSignature } from "@/lib/channels/twilio";
+import { firmForTwilioNumber, verifyTwilioSignature } from "@/lib/channels/twilio";
 import { enqueue } from "@/lib/queue";
 
 export const dynamic = "force-dynamic";
@@ -15,10 +15,12 @@ export async function POST(request: Request) {
   if (!(await verifyTwilioSignature(request, params))) {
     return new NextResponse("invalid signature", { status: 403 });
   }
-  if (params.RecordingUrl && params.CallSid) {
+  const firm = await firmForTwilioNumber(params.To);
+  if (firm && params.RecordingUrl && params.CallSid) {
     await enqueue(
       "transcribe_voicemail",
       {
+        firmId: firm.id,
         callSid: params.CallSid,
         recordingUrl: params.RecordingUrl,
         from: params.From ?? params.Caller,

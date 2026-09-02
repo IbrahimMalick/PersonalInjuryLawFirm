@@ -1,16 +1,21 @@
-import { getFirm } from "@/lib/firm";
+import { notFound } from "next/navigation";
+import { getFirmBySlug } from "@/lib/firm";
 
 export const dynamic = "force-dynamic";
 
-// Public hosted intake form — the link a firm puts behind the "Contact us"
-// button on their website. Plain HTML form, works without JavaScript.
+// Public hosted intake form, one per firm — the link a firm puts behind the
+// "Contact us" button on their website. Plain HTML form, works without JS.
 
 export default async function IntakeForm({
+  params,
   searchParams,
 }: {
+  params: Promise<{ slug: string }>;
   searchParams: Promise<{ sent?: string }>;
 }) {
-  const firm = await getFirm();
+  const { slug } = await params;
+  const firm = await getFirmBySlug(slug);
+  if (!firm) notFound();
   const { sent } = await searchParams;
 
   const input =
@@ -50,7 +55,7 @@ export default async function IntakeForm({
         ) : (
           <form
             method="POST"
-            action="/api/inbound/webform?redirect=1"
+            action={`/api/inbound/webform?redirect=1&firm=${firm.slug}`}
             className="px-8 py-6 space-y-4"
           >
             <p className="text-[15px] leading-snug">

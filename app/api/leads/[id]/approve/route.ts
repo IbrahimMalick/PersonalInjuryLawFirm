@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { audit } from "@/lib/audit";
 import { apiUser } from "@/lib/auth";
 import { getDb, tables } from "@/lib/db";
-import { getFirm } from "@/lib/firm";
+import { getFirmById } from "@/lib/firm";
 import { disclaimerFor } from "@/lib/guardrails";
 import { enqueue } from "@/lib/queue";
 import { resolveReplyDestination } from "@/lib/reply";
@@ -23,7 +23,9 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
 
   const db = await getDb();
   const lead = (await db.select().from(tables.leads).where(eq(tables.leads.id, id)).limit(1))[0];
-  if (!lead) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!lead || lead.firmId !== user.firmId) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   if (lead.status !== "triaged" || !lead.caseFile) {
     return NextResponse.json({ error: "Lead is not ready for review" }, { status: 409 });
   }
@@ -53,18 +55,20 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     );
   }
 
-  const firm = await getFirm();
+  const firm = await getFirmById(user.firmId);
+  if (!firm) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const finalBody =
     body.trim() + "\n\n" + disclaimerFor(cf.claimant.preferredLanguage, firm.name);
 
   const edited = body.trim() !== (lead.draftReply ?? "").trim();
   if (edited) {
-    await audit("reply.edited", { leadId: id, userId: user.id });
+    await audit("reply.edited", { firmId: firm.id, leadId: id, userId: user.id });
   }
 
   const inserted = await db
     .insert(tables.messages)
     .values({
+      firmId: firm.id,
       leadId: id,
       channel: destination.channel,
       toAddress: destination.to,
@@ -79,6 +83,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     .where(eq(tables.leads.id, id));
 
   await audit("reply.approved", {
+    firmId: firm.id,
     leadId: id,
     userId: user.id,
     detail: { messageId: inserted[0].id, to: destination.to, channel: destination.channel, edited },

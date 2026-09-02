@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "61f3ba92-4060-41b2-931c-72e5f0f28257",
+  "id": "85699ad5-6601-4f0b-96dc-452904bb520f",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "adverse_parties": {
@@ -13,6 +13,13 @@
           "primaryKey": true,
           "notNull": true,
           "autoincrement": true
+        },
+        "firm_id": {
+          "name": "firm_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
         },
         "name": {
           "name": "name",
@@ -52,7 +59,16 @@
           "default": "(datetime('now'))"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "adverse_firm_idx": {
+          "name": "adverse_firm_idx",
+          "columns": [
+            "firm_id",
+            "active"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -67,6 +83,13 @@
           "primaryKey": true,
           "notNull": true,
           "autoincrement": true
+        },
+        "firm_id": {
+          "name": "firm_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         },
         "lead_id": {
           "name": "lead_id",
@@ -106,17 +129,18 @@
         }
       },
       "indexes": {
+        "audit_firm_idx": {
+          "name": "audit_firm_idx",
+          "columns": [
+            "firm_id",
+            "created_at"
+          ],
+          "isUnique": false
+        },
         "audit_lead_idx": {
           "name": "audit_lead_idx",
           "columns": [
             "lead_id"
-          ],
-          "isUnique": false
-        },
-        "audit_created_idx": {
-          "name": "audit_created_idx",
-          "columns": [
-            "created_at"
           ],
           "isUnique": false
         }
@@ -126,13 +150,20 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "firm": {
-      "name": "firm",
+    "firms": {
+      "name": "firms",
       "columns": {
         "id": {
           "name": "id",
           "type": "integer",
           "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
@@ -183,6 +214,20 @@
           "autoincrement": false,
           "default": "'NY'"
         },
+        "twilio_number": {
+          "name": "twilio_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "email_inbound_token": {
+          "name": "email_inbound_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "sol_acknowledged_at": {
           "name": "sol_acknowledged_at",
           "type": "text",
@@ -197,6 +242,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "onboarding_dismissed_at": {
+          "name": "onboarding_dismissed_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "text",
@@ -206,7 +258,29 @@
           "default": "(datetime('now'))"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "firms_slug_idx": {
+          "name": "firms_slug_idx",
+          "columns": [
+            "slug"
+          ],
+          "isUnique": true
+        },
+        "firms_email_token_idx": {
+          "name": "firms_email_token_idx",
+          "columns": [
+            "email_inbound_token"
+          ],
+          "isUnique": true
+        },
+        "firms_twilio_idx": {
+          "name": "firms_twilio_idx",
+          "columns": [
+            "twilio_number"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -323,6 +397,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "firm_id": {
+          "name": "firm_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "channel": {
           "name": "channel",
           "type": "text",
@@ -433,16 +514,18 @@
         }
       },
       "indexes": {
-        "leads_status_idx": {
-          "name": "leads_status_idx",
+        "leads_firm_status_idx": {
+          "name": "leads_firm_status_idx",
           "columns": [
+            "firm_id",
             "status"
           ],
           "isUnique": false
         },
-        "leads_received_idx": {
-          "name": "leads_received_idx",
+        "leads_firm_received_idx": {
+          "name": "leads_firm_received_idx",
           "columns": [
+            "firm_id",
             "received_at"
           ],
           "isUnique": false
@@ -470,6 +553,13 @@
           "primaryKey": true,
           "notNull": true,
           "autoincrement": true
+        },
+        "firm_id": {
+          "name": "firm_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
         },
         "lead_id": {
           "name": "lead_id",
@@ -551,6 +641,13 @@
             "lead_id"
           ],
           "isUnique": false
+        },
+        "messages_firm_idx": {
+          "name": "messages_firm_idx",
+          "columns": [
+            "firm_id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},
@@ -615,6 +712,13 @@
           "notNull": true,
           "autoincrement": true
         },
+        "firm_id": {
+          "name": "firm_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "email": {
           "name": "email",
           "type": "text",
@@ -667,6 +771,13 @@
             "email"
           ],
           "isUnique": true
+        },
+        "users_firm_idx": {
+          "name": "users_firm_idx",
+          "columns": [
+            "firm_id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {},

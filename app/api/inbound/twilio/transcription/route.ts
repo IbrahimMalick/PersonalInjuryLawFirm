@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { handleTranscription, verifyTwilioSignature } from "@/lib/channels/twilio";
+import {
+  firmForTwilioNumber,
+  handleTranscription,
+  verifyTwilioSignature,
+} from "@/lib/channels/twilio";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +16,8 @@ export async function POST(request: Request) {
   if (!(await verifyTwilioSignature(request, params))) {
     return new NextResponse("invalid signature", { status: 403 });
   }
-  await handleTranscription(params);
+  const firm = await firmForTwilioNumber(params.To);
+  if (firm) await handleTranscription(firm, params);
+  else console.warn(`[twilio] transcription for unrouted number ${params.To} — dropped`);
   return new NextResponse("ok");
 }

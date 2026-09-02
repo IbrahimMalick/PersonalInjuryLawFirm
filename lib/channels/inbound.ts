@@ -8,6 +8,7 @@ import { enqueue } from "../queue";
 // (channel, externalId) so provider webhook retries never duplicate a lead.
 
 export interface InboundLead {
+  firmId: number;
   channel: "sms" | "voicemail" | "webform" | "whatsapp" | "email";
   externalId?: string; // provider id; omit for channels without one
   fromAddress: string;
@@ -34,6 +35,7 @@ export async function ingestLead(
   const leadId = crypto.randomUUID();
   await db.insert(tables.leads).values({
     id: leadId,
+    firmId: inbound.firmId,
     channel: inbound.channel,
     externalId,
     fromAddress: inbound.fromAddress,
@@ -45,6 +47,7 @@ export async function ingestLead(
   });
 
   await audit("lead.received", {
+    firmId: inbound.firmId,
     leadId,
     detail: { channel: inbound.channel, from: inbound.fromAddress },
   });

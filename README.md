@@ -7,8 +7,11 @@ checks it against the firm's conflict list, computes the filing deadline from a 
 table (never from the model), and drafts a first reply that **waits for a human to approve**.
 The firm wakes up to organized cases instead of a chaotic inbox.
 
-One deployment serves one firm, with its own SQLite database on its own volume — data
-isolation by construction.
+One deployment serves every firm: attorneys sign up self-serve at `/signup`, get a working
+intake form immediately, and are walked through the rest by an onboarding checklist (and by
+you — the `/operator` console tracks each firm's remaining steps and provisions their phone
+number). Every row and every query is scoped by firm; cross-tenant access is covered by the
+isolation checks in the E2E suite.
 
 ![Live Desk screenshot](docs/screenshot.png)
 
@@ -17,7 +20,7 @@ isolation by construction.
 ```bash
 npm install
 cp .env.example .env.local     # add your ANTHROPIC_API_KEY
-npm run dev                    # → http://localhost:3000, first run walks through /setup
+npm run dev                    # → http://localhost:3000 → /signup creates your first firm
 ```
 
 Production, channel wiring (Twilio/SendGrid), backups, and the go-live checklist:

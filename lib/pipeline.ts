@@ -1,9 +1,9 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { audit } from "./audit";
 import { getDb, tables } from "./db";
 import type { LeadRow } from "./db/schema";
 import { buildCaseFile, extractModelOutput, type ExtractionInput } from "./extract";
-import { getFirm } from "./firm";
+import { getFirmById } from "./firm";
 import type { CaseFile, Channel } from "./schema";
 import { sendViaChannel } from "./channels/outbound";
 
@@ -46,7 +46,8 @@ export async function runProcessLead(leadId: string): Promise<void> {
   if (!lead) throw new Error(`Lead ${leadId} not found`);
   if (lead.status === "triaged" || lead.status === "archived") return; // idempotent
 
-  const firm = await getFirm();
+  const firm = await getFirmById(lead.firmId);
+  if (!firm) throw new Error(`Firm ${lead.firmId} not found for lead ${leadId}`);
   await db
     .update(tables.leads)
     .set({ status: "processing", processingError: null })
@@ -56,7 +57,12 @@ export async function runProcessLead(leadId: string): Promise<void> {
     await db
       .select()
       .from(tables.adverseParties)
-      .where(eq(tables.adverseParties.active, true))
+      .where(
+        and(
+          eq(tables.adverseParties.firmId, lead.firmId),
+          eq(tables.adverseParties.active, true)
+        )
+      )
   ).map((p) => ({ name: p.name, relationship: p.relationship }));
 
   const result = await extractModelOutput(toExtractionInput(lead, firm.timezone), {
@@ -79,6 +85,7 @@ export async function runProcessLead(leadId: string): Promise<void> {
     .where(eq(tables.leads.id, leadId));
 
   await audit("lead.triaged", {
+    firmId: lead.firmId,
     leadId,
     detail: {
       routing: caseFile.routing,
@@ -93,18 +100,25 @@ export async function runProcessLead(leadId: string): Promise<void> {
   });
 
   for (const flag of caseFile.conflictFlags) {
-    await audit("conflict.flagged", { leadId, detail: { match: flag } });
+    await audit("conflict.flagged", { firmId: lead.firmId, leadId, detail: { match: flag } });
   }
 }
 
 /** Called by the worker when a process_lead job exhausts its retries. */
 export async function markLeadNeedsAttention(leadId: string, error: string): Promise<void> {
   const db = await getDb();
+  const lead = (
+    await db.select().from(tables.leads).where(eq(tables.leads.id, leadId)).limit(1)
+  )[0];
   await db
     .update(tables.leads)
     .set({ status: "needs_attention", processingError: error.slice(0, 2000) })
     .where(eq(tables.leads.id, leadId));
-  await audit("extraction.failed", { leadId, detail: { error: error.slice(0, 500) } });
+  await audit("extraction.failed", {
+    firmId: lead?.firmId ?? null,
+    leadId,
+    detail: { error: error.slice(0, 500) },
+  });
 }
 
 export async function runSendMessage(messageId: number): Promise<void> {
@@ -115,7 +129,9 @@ export async function runSendMessage(messageId: number): Promise<void> {
   if (!message) throw new Error(`Message ${messageId} not found`);
   if (message.status !== "queued") return; // idempotent
 
-  const outcome = await sendViaChannel(message);
+  const firm = await getFirmById(message.firmId);
+  if (!firm) throw new Error(`Firm ${message.firmId} not found for message ${messageId}`);
+  const outcome = await sendViaChannel(message, firm);
   await db
     .update(tables.messages)
     .set({
@@ -127,6 +143,7 @@ export async function runSendMessage(messageId: number): Promise<void> {
     .where(eq(tables.messages.id, messageId));
 
   await audit(outcome.status === "failed" ? "message.failed" : "message.sent", {
+    firmId: message.firmId,
     leadId: message.leadId,
     detail: {
       messageId,

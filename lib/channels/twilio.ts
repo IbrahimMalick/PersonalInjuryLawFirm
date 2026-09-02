@@ -1,10 +1,12 @@
 import { and, eq } from "drizzle-orm";
 import { getDb, tables } from "../db";
+import type { FirmRow } from "../db/schema";
 import { ingestLead } from "./inbound";
 
-// Twilio inbound: SMS + WhatsApp messages, and voice calls answered with a
-// recorded-voicemail flow. All handlers verify Twilio's request signature —
-// an unsigned request never creates a lead.
+// Twilio inbound, multi-tenant: the platform owns one Twilio account; each
+// firm gets a number, and inbound requests are routed to the firm by the
+// number that was dialed/texted (the To parameter). All handlers verify
+// Twilio's request signature — an unsigned request never creates a lead.
 
 export function twilioWebhooksEnabled(): boolean {
   return Boolean(process.env.TWILIO_AUTH_TOKEN);
@@ -19,19 +21,38 @@ export async function verifyTwilioSignature(
   const signature = request.headers.get("x-twilio-signature");
   if (!signature) return false;
   const { default: twilio } = await import("twilio");
-  // Twilio signs the public URL it POSTed to. Behind a proxy, reconstruct it
-  // from PUBLIC_BASE_URL (required in production).
   const base = process.env.PUBLIC_BASE_URL;
   const url = base ? `${base}${new URL(request.url).pathname}` : request.url;
   return twilio.validateRequest(token, signature, url, params);
 }
 
-export async function handleInboundSms(params: Record<string, string>): Promise<void> {
+function normalizeNumber(n: string | undefined): string {
+  return (n ?? "").replace(/^whatsapp:/, "").trim();
+}
+
+/** Which firm does this inbound Twilio request belong to? Routed by To. */
+export async function firmForTwilioNumber(to: string | undefined): Promise<FirmRow | null> {
+  const number = normalizeNumber(to);
+  if (!number) return null;
+  const db = await getDb();
+  const rows = await db
+    .select()
+    .from(tables.firms)
+    .where(eq(tables.firms.twilioNumber, number))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function handleInboundSms(
+  firm: FirmRow,
+  params: Record<string, string>
+): Promise<void> {
   const isWhatsApp = params.From?.startsWith("whatsapp:");
   await ingestLead({
+    firmId: firm.id,
     channel: isWhatsApp ? "whatsapp" : "sms",
     externalId: params.MessageSid,
-    fromAddress: (params.From ?? "").replace(/^whatsapp:/, ""),
+    fromAddress: normalizeNumber(params.From),
     displayName: params.ProfileName ?? null,
     raw: params.Body ?? "",
     meta: {
@@ -59,15 +80,19 @@ export function voicemailTwiml(firmName: string): string {
 }
 
 /** Transcription callback: this is where the voicemail becomes a lead. */
-export async function handleTranscription(params: Record<string, string>): Promise<void> {
+export async function handleTranscription(
+  firm: FirmRow,
+  params: Record<string, string>
+): Promise<void> {
   const text =
     params.TranscriptionStatus === "completed" && params.TranscriptionText
       ? params.TranscriptionText
       : "(Automatic transcription was unavailable for this voicemail — listen to the recording.)";
   await ingestLead({
+    firmId: firm.id,
     channel: "voicemail",
     externalId: params.CallSid,
-    fromAddress: params.From ?? params.Caller ?? "unknown caller",
+    fromAddress: normalizeNumber(params.From ?? params.Caller) || "unknown caller",
     raw: text,
     meta: {
       recordingUrl: params.RecordingUrl,
@@ -83,6 +108,7 @@ export async function handleTranscription(params: Record<string, string>): Promi
  * becomes a lead instead of vanishing.
  */
 export async function runTranscribeVoicemail(payload: {
+  firmId: number;
   callSid: string;
   recordingUrl: string;
   from?: string;
@@ -99,6 +125,7 @@ export async function runTranscribeVoicemail(payload: {
   if (existing[0]) return; // transcription callback already created it
 
   await ingestLead({
+    firmId: payload.firmId,
     channel: "voicemail",
     externalId: payload.callSid,
     fromAddress: payload.from ?? "unknown caller",

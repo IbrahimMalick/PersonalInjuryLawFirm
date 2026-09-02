@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import AppShell from "@/components/product/AppShell";
-import { requireUser } from "@/lib/auth";
+import { requireFirmUser } from "@/lib/auth";
 import { getDb, tables } from "@/lib/db";
-import { getFirm } from "@/lib/firm";
 import { fmtDateTime } from "@/lib/format";
 import { isDemo } from "@/lib/mode";
 import type { CaseFile } from "@/lib/schema";
@@ -14,18 +13,17 @@ export const dynamic = "force-dynamic";
 
 export default async function ArchivePage() {
   if (isDemo()) redirect("/demo");
-  const user = await requireUser();
-  const firm = await getFirm();
+  const { user, firm } = await requireFirmUser();
   const db = await getDb();
   const leads = await db
     .select()
     .from(tables.leads)
-    .where(eq(tables.leads.status, "archived"))
+    .where(and(eq(tables.leads.firmId, firm.id), eq(tables.leads.status, "archived")))
     .orderBy(desc(tables.leads.receivedAt))
     .limit(200);
 
   return (
-    <AppShell user={user}>
+    <AppShell user={user} firm={firm}>
       <div className="px-6 pt-4 max-w-[1200px] mx-auto">
         <div className="flex items-center justify-between pb-3">
           <h1 className="font-display font-bold uppercase tracking-wide text-xl text-paper">

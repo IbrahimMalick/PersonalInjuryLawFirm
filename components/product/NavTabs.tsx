@@ -3,13 +3,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export default function NavTabs({ isAdmin }: { isAdmin: boolean }) {
+export default function NavTabs({
+  isAdmin,
+  isOperator,
+}: {
+  isAdmin: boolean;
+  isOperator?: boolean;
+}) {
   const path = usePathname();
   const tabs = [
     { href: "/", label: "Inbox" },
     { href: "/gap", label: "Cost of the Gap" },
     { href: "/guardrails", label: "Guardrails" },
     ...(isAdmin ? [{ href: "/settings", label: "Settings" }] : []),
+    ...(isOperator ? [{ href: "/operator", label: "Operator" }] : []),
   ];
   return (
     <nav className="flex items-end gap-1 h-full" aria-label="Screens">
