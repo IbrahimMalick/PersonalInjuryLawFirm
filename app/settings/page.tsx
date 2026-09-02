@@ -84,9 +84,14 @@ export default async function SettingsPage({
           <h1 className="font-display font-bold uppercase tracking-wide text-2xl text-paper">
             Settings
           </h1>
-          <Link href="/settings/conflicts" className="field-label text-manila hover:text-meter">
-            Conflict list ▸
-          </Link>
+          <span className="flex gap-5">
+            <Link href="/settings/billing" className="field-label text-manila hover:text-meter">
+              Billing ▸
+            </Link>
+            <Link href="/settings/conflicts" className="field-label text-manila hover:text-meter">
+              Conflict list ▸
+            </Link>
+          </span>
         </div>
 
         <div className="grid grid-cols-2 gap-4 items-start">

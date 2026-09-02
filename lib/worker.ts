@@ -3,15 +3,12 @@ import { markLeadNeedsAttention, runProcessLead, runSendMessage } from "./pipeli
 import { runTranscribeVoicemail } from "./channels/twilio";
 import type { JobRow } from "./db/schema";
 
-// In-process background worker, started once per server from
-// instrumentation.ts. Polls the jobs table; serial execution is deliberate —
-// per-firm volumes are small and ordering beats parallel surprises.
-
-const POLL_MS = 2000;
-
-declare global {
-  var __nightshiftWorker: { running: boolean } | undefined;
-}
+// Job execution, shared by two runtimes:
+//   - Long-running deployments (Docker/VPS/Fly): startWorker() polls forever,
+//     booted from instrumentation.ts.
+//   - Vercel/serverless: drainJobs() runs after responses (queue kicks) and
+//     from the /api/jobs/run cron sweeper. Claims are atomic, so overlap with
+//     another drain is safe.
 
 async function handle(job: JobRow): Promise<void> {
   switch (job.type) {
@@ -33,12 +30,12 @@ async function onDead(job: JobRow, error: Error): Promise<void> {
   if (job.type === "process_lead") {
     await markLeadNeedsAttention(String(job.payload.leadId), error.message);
   }
-  // Failed sends stay visible on the message row + audit log; no extra action.
 }
 
-async function tick(): Promise<void> {
+/** Process one claimed job; returns false when the queue was empty. */
+export async function tick(): Promise<boolean> {
   const job = await claimNext();
-  if (!job) return;
+  if (!job) return false;
   try {
     await handle(job);
     await completeJob(job.id);
@@ -53,6 +50,20 @@ async function tick(): Promise<void> {
       );
     }
   }
+  return true;
+}
+
+/** Drain up to `max` runnable jobs; returns how many were processed. */
+export async function drainJobs(max = 25): Promise<number> {
+  let n = 0;
+  while (n < max && (await tick())) n++;
+  return n;
+}
+
+const POLL_MS = 2000;
+
+declare global {
+  var __nightshiftWorker: { running: boolean } | undefined;
 }
 
 export function startWorker(): void {

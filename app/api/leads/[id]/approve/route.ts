@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { audit } from "@/lib/audit";
 import { apiUser } from "@/lib/auth";
 import { getDb, tables } from "@/lib/db";
+import { firmBillingState } from "@/lib/billing";
 import { getFirmById } from "@/lib/firm";
 import { disclaimerFor } from "@/lib/guardrails";
 import { enqueue } from "@/lib/queue";
@@ -17,6 +18,12 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request, ctx: { params: Promise<{ id: string }> }) {
   const user = await apiUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!user.emailVerifiedAt) {
+    return NextResponse.json(
+      { error: "Verify your email before sending replies — check your inbox for the link" },
+      { status: 403 }
+    );
+  }
   const { id } = await ctx.params;
   const { body } = (await request.json()) as { body?: string };
   if (!body?.trim()) return NextResponse.json({ error: "Reply body is empty" }, { status: 400 });
@@ -57,6 +64,12 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
 
   const firm = await getFirmById(user.firmId);
   if (!firm) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (firmBillingState(firm).kind === "blocked") {
+    return NextResponse.json(
+      { error: "Trial ended — subscribe under Settings → Billing to resume sending" },
+      { status: 403 }
+    );
+  }
   const finalBody =
     body.trim() + "\n\n" + disclaimerFor(cf.claimant.preferredLanguage, firm.name);
 

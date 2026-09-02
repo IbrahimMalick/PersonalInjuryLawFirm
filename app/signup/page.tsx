@@ -4,6 +4,9 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { audit } from "@/lib/audit";
 import { createSession, hashPassword } from "@/lib/auth";
+import { sendVerificationEmail } from "@/lib/auth-tokens";
+import { billingEnabled, TRIAL_DAYS } from "@/lib/billing";
+import { updateFirm } from "@/lib/firm";
 import { getDb, tables } from "@/lib/db";
 import { createFirm } from "@/lib/firm";
 
@@ -50,6 +53,11 @@ async function signup(formData: FormData): Promise<void> {
   if (existing[0]) redirect("/signup?error=email");
 
   const firm = await createFirm(firmName, practiceLine);
+  if (billingEnabled()) {
+    await updateFirm(firm.id, {
+      trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 86_400_000).toISOString(),
+    });
+  }
   const inserted = await db
     .insert(tables.users)
     .values({
@@ -59,7 +67,8 @@ async function signup(formData: FormData): Promise<void> {
       passwordHash: await hashPassword(password),
       role: "admin",
     })
-    .returning({ id: tables.users.id });
+    .returning();
+  await sendVerificationEmail(inserted[0]);
 
   await audit("firm.signed_up", {
     firmId: firm.id,
@@ -67,7 +76,7 @@ async function signup(formData: FormData): Promise<void> {
     detail: { firmName, slug: firm.slug, adminEmail: email },
   });
   await createSession(inserted[0].id);
-  redirect("/");
+  redirect("/?welcome=1");
 }
 
 const ERRORS: Record<string, string> = {
@@ -144,6 +153,12 @@ export default async function SignupPage({
           >
             Create your firm&apos;s desk
           </button>
+          <p className="text-center text-[13px] text-dim leading-snug">
+            By creating an account you agree to the{" "}
+            <Link href="/terms" className="underline underline-offset-4">Terms of Service</Link>{" "}
+            and{" "}
+            <Link href="/privacy" className="underline underline-offset-4">Privacy Policy</Link>.
+          </p>
           <p className="text-center text-sm text-dim">
             Already set up?{" "}
             <Link href="/login" className="text-manila underline underline-offset-4">

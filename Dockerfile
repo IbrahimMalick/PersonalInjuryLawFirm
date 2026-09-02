@@ -1,4 +1,5 @@
-# Nightshift — one container per firm. SQLite lives on the /data volume.
+# Nightshift — single multi-tenant deployment. With DATABASE_URL set the app
+# uses that Postgres; without it, an embedded PGlite store lives on /data.
 
 FROM node:22-slim AS deps
 WORKDIR /app
@@ -18,7 +19,7 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
     HOSTNAME=0.0.0.0 \
-    DATABASE_PATH=/data/nightshift.db
+    PGLITE_DIR=/data/pg
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public

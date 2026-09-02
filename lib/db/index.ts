@@ -1,52 +1,61 @@
-import { createClient, type Client } from "@libsql/client";
-import { drizzle, type LibSQLDatabase } from "drizzle-orm/libsql";
-import { migrate } from "drizzle-orm/libsql/migrator";
 import fs from "fs";
 import path from "path";
 import * as schema from "./schema";
 
-// One SQLite file per firm instance. DATABASE_PATH points at a mounted volume
-// in production (see Dockerfile); defaults to ./data locally.
+// Postgres everywhere, two drivers:
+//   - DATABASE_URL set  → node-postgres Pool (Neon / Supabase / RDS / Vercel
+//     Postgres — anything that speaks the wire protocol). Production.
+//   - DATABASE_URL unset → embedded PGlite persisted to ./data/pg (real
+//     Postgres compiled to WASM, in-process). `npm run dev` needs zero setup.
+// Same Drizzle schema, same migrations folder for both.
 
-const DB_PATH = process.env.DATABASE_PATH ?? path.join(process.cwd(), "data", "nightshift.db");
-
-type DB = LibSQLDatabase<typeof schema>;
+type AnyDb = import("drizzle-orm/node-postgres").NodePgDatabase<typeof schema>;
 
 declare global {
-  // Survive Next.js dev-server module reloads without re-opening handles.
-  var __nightshiftDb:
-    | { client: Client; db: DB; ready: Promise<void> | null }
-    | undefined;
+  var __nightshiftPg: { db: AnyDb; ready: Promise<void> | null } | undefined;
 }
 
-function init(): { client: Client; db: DB; ready: Promise<void> | null } {
-  if (!globalThis.__nightshiftDb) {
-    fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-    const client = createClient({ url: `file:${DB_PATH}` });
-    const db = drizzle(client, { schema });
-    globalThis.__nightshiftDb = { client, db, ready: null };
+async function create(): Promise<{ db: AnyDb; migrate: () => Promise<void> }> {
+  const url = process.env.DATABASE_URL;
+  const migrationsFolder = path.join(process.cwd(), "drizzle");
+
+  if (url) {
+    const { Pool } = await import("pg");
+    const { drizzle } = await import("drizzle-orm/node-postgres");
+    const { migrate } = await import("drizzle-orm/node-postgres/migrator");
+    const pool = new Pool({ connectionString: url, max: 5 });
+    const db = drizzle(pool, { schema });
+    return { db, migrate: () => migrate(db, { migrationsFolder }) };
   }
-  return globalThis.__nightshiftDb;
+
+  const dataDir = process.env.PGLITE_DIR ?? path.join(process.cwd(), "data", "pg");
+  fs.mkdirSync(dataDir, { recursive: true });
+  const { PGlite } = await import("@electric-sql/pglite");
+  const { drizzle } = await import("drizzle-orm/pglite");
+  const { migrate } = await import("drizzle-orm/pglite/migrator");
+  const client = new PGlite(dataDir);
+  const db = drizzle(client, { schema }) as unknown as AnyDb;
+  return {
+    db,
+    migrate: () =>
+      migrate(db as unknown as Parameters<typeof migrate>[0], { migrationsFolder }),
+  };
 }
 
-export async function getDb(): Promise<DB> {
-  const holder = init();
-  // Single shared promise so concurrent first callers (worker boot + first
-  // HTTP request) never run migrations twice.
-  if (!holder.ready) {
-    holder.ready = (async () => {
-      await holder.client.execute("PRAGMA journal_mode = WAL;");
-      await holder.client.execute("PRAGMA busy_timeout = 5000;");
-      await migrate(holder.db, {
-        migrationsFolder: path.join(process.cwd(), "drizzle"),
-      });
+export async function getDb(): Promise<AnyDb> {
+  if (!globalThis.__nightshiftPg) {
+    globalThis.__nightshiftPg = { db: undefined as unknown as AnyDb, ready: null };
+    globalThis.__nightshiftPg.ready = (async () => {
+      const { db, migrate } = await create();
+      await migrate();
+      globalThis.__nightshiftPg!.db = db;
     })().catch((e) => {
-      holder.ready = null; // allow retry on transient failure
+      globalThis.__nightshiftPg = undefined; // allow retry on transient failure
       throw e;
     });
   }
-  await holder.ready;
-  return holder.db;
+  await globalThis.__nightshiftPg.ready;
+  return globalThis.__nightshiftPg.db;
 }
 
 export * as tables from "./schema";

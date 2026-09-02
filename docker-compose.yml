@@ -1,5 +1,7 @@
-# One firm, one instance. `docker compose up -d`, then open http://localhost:3000
-# and complete first-run setup.
+# Single multi-tenant deployment. `docker compose up -d`, then open
+# http://localhost:3000 — firms sign up at /signup. Set DATABASE_URL in
+# .env.local to use external Postgres; otherwise the embedded store
+# persists to the /data volume.
 services:
   nightshift:
     build: .

@@ -23,7 +23,11 @@ cp .env.example .env.local     # add your ANTHROPIC_API_KEY
 npm run dev                    # → http://localhost:3000 → /signup creates your first firm
 ```
 
-Production, channel wiring (Twilio/SendGrid), backups, and the go-live checklist:
+No database setup needed locally — an embedded Postgres (PGlite) persists to `./data/pg`;
+production points `DATABASE_URL` at real Postgres. Signup includes email verification, and
+a 14-day trial + Stripe subscription kick in once Stripe keys are configured (free
+otherwise). Deploying to Vercel click-by-click: **[DEPLOY-VERCEL.md](DEPLOY-VERCEL.md)**.
+Docker/VPS, channel wiring (Twilio/SendGrid), backups, and the go-live checklist:
 **[DEPLOY.md](DEPLOY.md)**. The original filmable sales demo — seeded leads, simulated
 2:47 AM clock, break-it button — is intact: `NIGHTSHIFT_MODE=demo npm run dev`, or `/demo`
 on a live instance (behind login).
@@ -35,7 +39,7 @@ flowchart LR
     subgraph Inbound
         TW[Twilio SMS / voicemail / WhatsApp] & WF[Hosted web form] & EM[Email parse]
     end
-    TW & WF & EM -->|verified webhooks, idempotent| DB[(SQLite · Drizzle)]
+    TW & WF & EM -->|verified webhooks, idempotent| DB[(Postgres · Drizzle)]
     DB --> Q[Job queue - retries, backoff, dead-letter]
     Q --> LLM["Claude (claude-sonnet-4-6)\nextraction + draft only"]
     LLM -->|strict JSON, zod, retry once| CODE[Application code]

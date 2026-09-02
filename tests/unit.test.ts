@@ -140,3 +140,29 @@ describe("resolveReplyDestination", () => {
     expect(resolveReplyDestination(lead("webform", "webform"), out as never)).toBeNull();
   });
 });
+
+describe("firmBillingState", async () => {
+  const { firmBillingState } = await import("../lib/billing");
+  const firm = (over: Record<string, unknown>) =>
+    ({ subscriptionStatus: null, trialEndsAt: null, ...over }) as never;
+  it("is free when Stripe is not configured", () => {
+    delete process.env.STRIPE_SECRET_KEY;
+    expect(firmBillingState(firm({})).kind).toBe("free");
+  });
+  it("tracks trial, active, past_due, blocked when configured", () => {
+    process.env.STRIPE_SECRET_KEY = "sk_test_x";
+    process.env.STRIPE_PRICE_ID = "price_x";
+    const inTrial = firm({ trialEndsAt: new Date(Date.now() + 3 * 86_400_000).toISOString() });
+    expect(firmBillingState(inTrial)).toMatchObject({ kind: "trialing", daysLeft: 3 });
+    expect(firmBillingState(firm({ subscriptionStatus: "active" })).kind).toBe("active");
+    expect(firmBillingState(firm({ subscriptionStatus: "past_due" }))).toMatchObject({
+      kind: "active",
+      pastDue: true,
+    });
+    const expired = firm({ trialEndsAt: new Date(Date.now() - 86_400_000).toISOString() });
+    expect(firmBillingState(expired).kind).toBe("blocked");
+    expect(firmBillingState(firm({ subscriptionStatus: "canceled" })).kind).toBe("blocked");
+    delete process.env.STRIPE_SECRET_KEY;
+    delete process.env.STRIPE_PRICE_ID;
+  });
+});

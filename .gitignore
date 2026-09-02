@@ -54,3 +54,6 @@ CLAUDE.md
 /data/*.db
 /data/*.db-*
 /data/backup-*.db
+
+# embedded postgres (PGlite) instance data
+/data/pg/

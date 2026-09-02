@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { updateFirm } from "@/lib/firm";
 import AppShell from "@/components/product/AppShell";
-import { requireFirmUser } from "@/lib/auth";
+import { currentUser, requireFirmUser } from "@/lib/auth";
+import Landing from "@/components/Landing";
 import { getDb, tables } from "@/lib/db";
 import { isDemo } from "@/lib/mode";
 import { fmtDateTime, agoLabel } from "@/lib/format";
@@ -163,6 +164,7 @@ async function OnboardingCard({
 
 export default async function Inbox() {
   if (isDemo()) redirect("/demo");
+  if (!(await currentUser())) return <Landing />;
   const { user, firm } = await requireFirmUser();
   const db = await getDb();
 

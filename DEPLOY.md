@@ -1,16 +1,21 @@
 # Deploying Nightshift
 
-**One deployment serves every firm.** Attorneys self-serve at `/signup`;
-every row is scoped by firm id and every query enforces it (two-firm
-isolation is covered by the E2E checks). Your team's accounts, allowlisted in
-`OPERATOR_EMAILS`, get the `/operator` console for onboarding and phone-number
-provisioning. Requires a **long-running Node process** (the background worker
-runs inside the web process), so any Docker host works; serverless does not.
+**One deployment serves every firm.** Attorneys self-serve at `/signup`
+(email verification + 14-day trial when Stripe is configured); every row is
+scoped by firm id and every query enforces it (two-firm isolation is covered
+by the E2E checks). Your team's accounts, allowlisted in `OPERATOR_EMAILS`,
+get the `/operator` console for onboarding and phone-number provisioning.
 
-Storage is a single SQLite file behind Drizzle — right for one app server and
-early-stage firm counts, with Litestream for continuous replication. Swap to
-Postgres (Drizzle dialect change + regenerated migrations) when you need a
-second app server or managed point-in-time recovery.
+**Recommended: Vercel + Neon Postgres — the click-by-click guide is
+[DEPLOY-VERCEL.md](DEPLOY-VERCEL.md).** Jobs run serverlessly there: work is
+drained right after each response, with a minutely cron sweeper
+(`/api/jobs/run`, `CRON_SECRET`) as the retry safety net.
+
+Storage is Postgres behind Drizzle. Set `DATABASE_URL` to any standard
+Postgres (Neon / Supabase / Vercel Postgres / RDS); with it unset — local dev
+or a single Docker box — an embedded Postgres (PGlite) persists to
+`./data/pg` with zero setup. On a long-running host the background worker
+runs inside the web process automatically; no separate worker to deploy.
 
 ## Local / development
 
@@ -41,7 +46,8 @@ fly volumes create nightshift_data --size 3
 # and: [env] PUBLIC_BASE_URL="https://your-domain.com"
 fly secrets set ANTHROPIC_API_KEY=... OPERATOR_EMAILS=... TWILIO_ACCOUNT_SID=... TWILIO_AUTH_TOKEN=...
 fly deploy
-fly scale count 1   # REQUIRED: single SQLite writer + in-process worker
+fly scale count 1   # single PGlite writer + in-process worker
+# (set DATABASE_URL to external Postgres to scale past one machine)
 ```
 
 ## Platform setup (you, once)
@@ -83,22 +89,20 @@ completes (weeks of lead time — start early).
 
 ## Backups
 
-The database is one file. Nightly cron on the host:
-
-```bash
-docker compose exec nightshift sh -c \
-  'node -e "require(\"@libsql/client\").createClient({url:\"file:/data/nightshift.db\"}).execute(\"VACUUM INTO /data/backup-$(date +%F).db\")"'
-```
-
-…then ship `/data/backup-*.db` off the box (rclone/S3). For continuous
-replication, [Litestream](https://litestream.io) pointed at
-`/data/nightshift.db` is the standard answer.
+On managed Postgres (Neon/Supabase/RDS) use the provider's point-in-time
+recovery — it's on by default on Neon. On a self-hosted box running the
+embedded store, snapshot the `/data` volume nightly (stop-copy-start, or
+filesystem snapshots) and ship it off the machine; or just set
+`DATABASE_URL` and let a managed Postgres carry the durability story.
 
 ## Go-live checklist
 
 - [ ] `PUBLIC_BASE_URL` set, TLS terminated in front
 - [ ] `ANTHROPIC_API_KEY` set (send one test lead through `/intake`, watch it triage)
 - [ ] `OPERATOR_EMAILS` set; `/operator` reachable by your team only
+- [ ] SendGrid configured; a signup's verification email actually arrives
+- [ ] Stripe live keys + webhook set; a test subscription flips the firm to Active
+- [ ] `/terms` and `/privacy` reviewed by counsel; bracketed placeholders replaced
 - [ ] Signed up a test firm; verified another account cannot see its leads
 - [ ] Conflict list loaded; a matching test lead fires the hold
 - [ ] SOL table reviewed by an attorney at the firm and acknowledged

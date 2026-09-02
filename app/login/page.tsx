@@ -30,9 +30,9 @@ async function login(formData: FormData): Promise<void> {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; reset?: string; verify?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, reset, verify } = await searchParams;
 
   const input =
     "w-full rounded-sm border border-ink-line bg-ink px-3 py-2.5 text-[16px] text-inktext focus:outline focus:outline-2 focus:outline-meter";
@@ -57,6 +57,16 @@ export default async function LoginPage({
             That email and password don&apos;t match an active account.
           </p>
         )}
+        {reset && (
+          <p className="text-ok text-sm border border-ok/50 rounded-sm px-3 py-2">
+            Password updated — sign in with the new one.
+          </p>
+        )}
+        {verify === "invalid" && (
+          <p className="text-stamp text-sm border border-stamp/50 rounded-sm px-3 py-2">
+            That verification link is expired or already used — sign in and resend it.
+          </p>
+        )}
         <label className="block">
           <span className="field-label text-dim">Email</span>
           <input name="email" type="email" required className={input} autoComplete="email" />
@@ -77,6 +87,11 @@ export default async function LoginPage({
         >
           Sign in
         </button>
+        <p className="text-center text-sm text-dim">
+          <Link href="/forgot" className="text-dim underline underline-offset-4 hover:text-manila">
+            Forgot password?
+          </Link>
+        </p>
         <p className="text-center text-sm text-dim">
           New firm?{" "}
           <Link href="/signup" className="text-manila underline underline-offset-4">
