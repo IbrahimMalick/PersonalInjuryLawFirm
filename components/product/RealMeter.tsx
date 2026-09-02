@@ -49,7 +49,10 @@ export default function RealMeter({
     <div className="flex items-stretch gap-6 shrink-0 font-mono">
       <div className="text-right">
         <div className="field-label text-dim">Firm time</div>
-        <div className="text-meter text-3xl font-semibold tabular-nums leading-none mt-1">
+        <div
+          suppressHydrationWarning
+          className="text-meter text-3xl font-semibold tabular-nums leading-none mt-1"
+        >
           {clock}
         </div>
       </div>
@@ -57,7 +60,10 @@ export default function RealMeter({
       {oldestMs ? (
         <div className="text-right">
           <div className="field-label text-dim">Oldest unanswered</div>
-          <div className="text-meter text-3xl font-semibold tabular-nums leading-none mt-1">
+          <div
+            suppressHydrationWarning
+            className="text-meter text-3xl font-semibold tabular-nums leading-none mt-1"
+          >
             {formatElapsed(now - oldestMs)}
           </div>
         </div>
