@@ -1,12 +1,32 @@
-// Platform email (verification, password reset) via SendGrid. Without a key,
-// falls back to logging the link on the server console — dev and pre-SendGrid
-// environments keep working, visibly.
+import { ghlConfigured, ghlSendEmail } from "./channels/ghl";
+
+// Platform email (verification, password reset). Provider is chosen by
+// EMAIL_PROVIDER:
+//   "ghl"   → GoHighLevel LeadConnector API
+//   unset / anything else → SendGrid
+// Without a working provider it falls back to logging the link on the server
+// console — dev and pre-provider environments keep working, visibly.
 
 export async function sendPlatformEmail(
   to: string,
   subject: string,
   body: string
 ): Promise<void> {
+  if (process.env.EMAIL_PROVIDER === "ghl") {
+    if (!ghlConfigured()) {
+      console.warn(
+        `[email] EMAIL_PROVIDER=ghl but GHL_API_TOKEN / GHL_LOCATION_ID / GHL_EMAIL_FROM ` +
+          `not all set — email to ${to} (${subject}):\n${body}`
+      );
+      return;
+    }
+    const result = await ghlSendEmail(to, subject, body);
+    if (!result.ok) {
+      console.error(`[email] GHL send to ${to} failed: ${result.error}`);
+    }
+    return;
+  }
+
   const key = process.env.SENDGRID_API_KEY;
   const from = process.env.EMAIL_FROM_ADDRESS;
   if (!key || !from) {
