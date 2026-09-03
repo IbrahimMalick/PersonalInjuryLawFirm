@@ -6,6 +6,7 @@ import { buildCaseFile, extractModelOutput, type ExtractionInput } from "./extra
 import { getFirmById } from "./firm";
 import type { CaseFile, Channel } from "./schema";
 import { sendViaChannel } from "./channels/outbound";
+import { syncLeadToGhl } from "./channels/ghl-sync";
 
 // The live processing pipeline. Jobs land here from the worker.
 // Product rule: a real inquiry NEVER receives a cached/canned result — if
@@ -102,6 +103,16 @@ export async function runProcessLead(leadId: string): Promise<void> {
   for (const flag of caseFile.conflictFlags) {
     await audit("conflict.flagged", { firmId: lead.firmId, leadId, detail: { match: flag } });
   }
+
+  await syncLeadToGhl({
+    leadId,
+    channel: lead.channel,
+    fromAddress: lead.fromAddress,
+    displayName: lead.displayName,
+    raw: lead.raw,
+    firmName: firm.name,
+    caseFile,
+  });
 }
 
 /** Called by the worker when a process_lead job exhausts its retries. */
@@ -119,6 +130,20 @@ export async function markLeadNeedsAttention(leadId: string, error: string): Pro
     leadId,
     detail: { error: error.slice(0, 500) },
   });
+
+  if (lead) {
+    const firm = await getFirmById(lead.firmId);
+    await syncLeadToGhl({
+      leadId,
+      channel: lead.channel,
+      fromAddress: lead.fromAddress,
+      displayName: lead.displayName,
+      raw: lead.raw,
+      firmName: firm?.name ?? "Unknown firm",
+      caseFile: null,
+      processingError: error,
+    });
+  }
 }
 
 export async function runSendMessage(messageId: number): Promise<void> {

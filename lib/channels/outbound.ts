@@ -1,4 +1,5 @@
 import type { FirmRow, MessageRow } from "../db/schema";
+import { ghlConfigured, ghlSendEmail } from "./ghl";
 
 // Outbound senders. Each channel sends for real when its credentials are
 // configured, and otherwise runs in SIMULATED mode: the message is marked
@@ -46,14 +47,23 @@ async function sendSms(
 }
 
 function emailConfigured(): boolean {
+  if (process.env.EMAIL_PROVIDER === "ghl") return ghlConfigured();
   return Boolean(process.env.SENDGRID_API_KEY && process.env.EMAIL_FROM_ADDRESS);
 }
 
 async function sendEmail(to: string, body: string, subject: string): Promise<SendOutcome> {
   if (!emailConfigured()) {
-    console.warn(`[nightshift] SendGrid not configured — SIMULATED email to ${to}`);
+    console.warn(`[nightshift] email provider not configured — SIMULATED email to ${to}`);
     return { status: "simulated" };
   }
+
+  if (process.env.EMAIL_PROVIDER === "ghl") {
+    const result = await ghlSendEmail(to, subject, body);
+    return result.ok
+      ? { status: "sent", providerId: result.providerId }
+      : { status: "failed", error: result.error };
+  }
+
   try {
     const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
       method: "POST",

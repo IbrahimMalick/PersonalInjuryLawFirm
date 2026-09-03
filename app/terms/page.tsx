@@ -21,7 +21,7 @@ export default function TermsPage() {
         <section>
           <h2 className="font-display font-bold uppercase tracking-wide text-lg">1. The service</h2>
           <p>
-            Nightshift (&ldquo;the Service&rdquo;), operated by [COMPANY LEGAL NAME]
+            Nightshift (&ldquo;the Service&rdquo;), operated by The Digital Tutor LLC
             (&ldquo;we,&rdquo; &ldquo;us&rdquo;), is software that helps law firms
             (&ldquo;Customers&rdquo;) manage inbound client inquiries: it receives messages
             across channels the Customer connects, uses artificial intelligence to extract a
@@ -146,10 +146,10 @@ export default function TermsPage() {
             10. General
           </h2>
           <p>
-            These terms are governed by the laws of [STATE], excluding conflicts rules, with
-            exclusive venue in [COUNTY, STATE]. We may update these terms with notice; changes
-            take effect at your next renewal or 30 days after notice, whichever is later.
-            Contact: [SUPPORT EMAIL].
+            These terms are governed by the laws of the State of New York, excluding conflicts
+            rules, with exclusive venue in Bronx County, New York. We may update these terms
+            with notice; changes take effect at your next renewal or 30 days after notice,
+            whichever is later. Contact: info@thedigitaltutor.net.
           </p>
         </section>
 
