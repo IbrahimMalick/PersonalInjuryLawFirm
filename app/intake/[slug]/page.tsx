@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import IntakeSubmitButton from "@/components/IntakeSubmitButton";
 import { getFirmBySlug } from "@/lib/firm";
 
 export const dynamic = "force-dynamic";
@@ -95,12 +96,9 @@ export default async function IntakeForm({
               className="absolute -left-[9999px] w-px h-px opacity-0"
             />
             <input type="hidden" name="_renderedAt" value={Date.now()} />
-            <button
-              type="submit"
-              className="w-full rounded-sm bg-carbon text-paper font-display font-bold uppercase tracking-wider text-lg py-3 hover:bg-ink transition-colors"
-            >
+            <IntakeSubmitButton className="w-full rounded-sm bg-carbon text-paper font-display font-bold uppercase tracking-wider text-lg py-3 hover:bg-ink transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
               Send to our intake team
-            </button>
+            </IntakeSubmitButton>
             <p className="text-[13px] leading-snug text-paperdim">
               Submitting this form does not create an attorney-client relationship, and nothing
               here is legal advice. A member of our team reviews every inquiry personally. If
