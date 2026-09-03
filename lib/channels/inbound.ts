@@ -1,11 +1,15 @@
 import crypto from "crypto";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, gt } from "drizzle-orm";
 import { audit } from "../audit";
 import { getDb, tables } from "../db";
 import { enqueue } from "../queue";
 
 // Single entry point for every inbound channel. Idempotent on
 // (channel, externalId) so provider webhook retries never duplicate a lead.
+// Channels with no provider id (the web form) get a short-window content check
+// instead, so an accidental double-click doesn't create duplicate leads.
+
+const RESUBMIT_WINDOW_MS = 10 * 60_000;
 
 export interface InboundLead {
   firmId: number;
@@ -32,6 +36,28 @@ export async function ingestLead(
     .limit(1);
   if (existing[0]) return { leadId: existing[0].id, duplicate: true };
 
+  const raw = inbound.raw.slice(0, 20_000);
+
+  if (!inbound.externalId) {
+    // No provider id: dedupe on an identical body from the same sender to the
+    // same firm within RESUBMIT_WINDOW_MS. A genuine re-inquiry later still lands.
+    const since = new Date(Date.now() - RESUBMIT_WINDOW_MS).toISOString();
+    const recent = await db
+      .select({ id: tables.leads.id, raw: tables.leads.raw })
+      .from(tables.leads)
+      .where(
+        and(
+          eq(tables.leads.firmId, inbound.firmId),
+          eq(tables.leads.channel, inbound.channel),
+          eq(tables.leads.fromAddress, inbound.fromAddress),
+          gt(tables.leads.receivedAt, since)
+        )
+      )
+      .orderBy(desc(tables.leads.receivedAt))
+      .limit(1);
+    if (recent[0]?.raw === raw) return { leadId: recent[0].id, duplicate: true };
+  }
+
   const leadId = crypto.randomUUID();
   await db.insert(tables.leads).values({
     id: leadId,
@@ -40,7 +66,7 @@ export async function ingestLead(
     externalId,
     fromAddress: inbound.fromAddress,
     displayName: inbound.displayName ?? null,
-    raw: inbound.raw.slice(0, 20_000),
+    raw,
     meta: inbound.meta ?? {},
     receivedAt: new Date().toISOString(),
     status: "received",
