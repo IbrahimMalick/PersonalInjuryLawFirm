@@ -101,6 +101,55 @@ export default function Landing() {
           ))}
         </section>
 
+        {/* Versus answering services */}
+        <section className="px-6 pb-16 max-w-[1000px] mx-auto">
+          <h2 className="font-display font-bold uppercase tracking-wide text-2xl text-paper pb-3 text-center">
+            &ldquo;We already pay an answering service&rdquo;
+          </h2>
+          <p className="text-dim text-center max-w-2xl mx-auto leading-relaxed pb-8">
+            Keep it if your callers love a live voice — plenty of firms run both. The
+            difference is what lands on your desk the next morning. A receptionist takes a
+            message; Nightshift makes the case ready to act on — from calls <em>and</em> the
+            texts, emails, web forms, and WhatsApps no receptionist ever sees. One flat
+            monthly price. No per-call meter running on spam and wrong numbers.
+          </p>
+          <div className="grid grid-cols-2 gap-4 items-start">
+            <div>
+              <p className="field-label text-dim pb-2">What a message service delivers</p>
+              <div className="rounded-sm border border-ink-line bg-ink-raised px-5 py-5 font-mono text-[14px] text-dim leading-loose">
+                <p className="text-inktext">WHILE YOU WERE OUT</p>
+                <p>Caller: Dana O.</p>
+                <p>Re: car accident (?)</p>
+                <p>Msg: &ldquo;please call her back&rdquo;</p>
+                <p>Taken: 3:12 AM</p>
+              </div>
+            </div>
+            <div>
+              <p className="field-label text-dim pb-2">What Nightshift delivers</p>
+              <div className="rounded-sm bg-paper text-papertext px-5 py-5 text-[14px] leading-loose">
+                <p className="font-display font-bold uppercase tracking-wide text-lg">
+                  Dana Ortiz — motor vehicle
+                </p>
+                <p>
+                  <span className="text-paperdim">Priority</span> 82 · ER visit · clear
+                  liability
+                </p>
+                <p>
+                  <span className="text-paperdim">Conflicts</span> none against your list
+                </p>
+                <p>
+                  <span className="text-paperdim">Deadline</span> computed by table + date
+                  math, never AI
+                </p>
+                <p>
+                  <span className="text-paperdim">Reply</span> drafted — waiting on your
+                  approval
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* How it starts */}
         <section className="px-6 pb-16 max-w-[800px] mx-auto">
           <h2 className="font-display font-bold uppercase tracking-wide text-2xl text-paper pb-4 text-center">
