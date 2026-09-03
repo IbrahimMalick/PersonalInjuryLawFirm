@@ -14,12 +14,16 @@
 //                     Email Services (e.g. intake@thedigitaltutor.net), optionally
 //                     "Display Name <intake@thedigitaltutor.net>"
 
-const API = "https://services.leadconnectorhq.com";
+export const GHL_API = "https://services.leadconnectorhq.com";
 
+/** Token + location present — enough for the contacts/notes API (lead sync). */
+export function ghlApiConfigured(): boolean {
+  return Boolean(process.env.GHL_API_TOKEN && process.env.GHL_LOCATION_ID);
+}
+
+/** ghlApiConfigured plus a verified from-address — needed to send email. */
 export function ghlConfigured(): boolean {
-  return Boolean(
-    process.env.GHL_API_TOKEN && process.env.GHL_LOCATION_ID && process.env.GHL_EMAIL_FROM
-  );
+  return ghlApiConfigured() && Boolean(process.env.GHL_EMAIL_FROM);
 }
 
 export interface GhlSendResult {
@@ -28,7 +32,7 @@ export interface GhlSendResult {
   error?: string;
 }
 
-function headers(version: string): Record<string, string> {
+export function ghlHeaders(version: string): Record<string, string> {
   return {
     Authorization: `Bearer ${process.env.GHL_API_TOKEN}`,
     Version: version,
@@ -50,9 +54,9 @@ function textToHtml(text: string): string {
 
 /** Upsert the recipient as a contact in the location; returns the contact id. */
 async function upsertContact(email: string, name?: string): Promise<string> {
-  const res = await fetch(`${API}/contacts/upsert`, {
+  const res = await fetch(`${GHL_API}/contacts/upsert`, {
     method: "POST",
-    headers: headers("2021-07-28"),
+    headers: ghlHeaders("2021-07-28"),
     body: JSON.stringify({
       locationId: process.env.GHL_LOCATION_ID,
       email,
@@ -81,9 +85,9 @@ export async function ghlSendEmail(
   if (!ghlConfigured()) return { ok: false, error: "GHL email is not configured" };
   try {
     const contactId = await upsertContact(to, opts.toName);
-    const res = await fetch(`${API}/conversations/messages`, {
+    const res = await fetch(`${GHL_API}/conversations/messages`, {
       method: "POST",
-      headers: headers("2021-04-15"),
+      headers: ghlHeaders("2021-04-15"),
       body: JSON.stringify({
         type: "Email",
         contactId,
