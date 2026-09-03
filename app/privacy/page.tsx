@@ -66,10 +66,9 @@ export default function PrivacyPage() {
             Subprocessors
           </h2>
           <p>
-            Anthropic (AI processing of message text), Twilio (phone, SMS, WhatsApp), SendGrid
-            (email), Stripe (payments), [HOSTING PROVIDER — e.g. Vercel] and [DATABASE
-            PROVIDER — e.g. Neon] (hosting and storage). Each receives only what its function
-            requires.
+            Anthropic (AI processing of message text), GoHighLevel (email), Twilio (phone,
+            SMS, WhatsApp), Stripe (payments), Vercel and Neon (hosting and storage). Each
+            receives only what its function requires.
           </p>
         </section>
 
@@ -92,7 +91,7 @@ export default function PrivacyPage() {
           </h2>
           <p>
             Firm users can access and correct account data in the product and request deletion
-            at [SUPPORT EMAIL]. Depending on where you live (e.g., California, EU/UK), you may
+            at info@thedigitaltutor.net. Depending on where you live (e.g., California, EU/UK), you may
             have additional rights — access, correction, deletion, portability — which we
             honor directly for account data and support the firm in honoring for inquiry data.
             We respond within the time the applicable law requires.
@@ -105,7 +104,7 @@ export default function PrivacyPage() {
           </h2>
           <p>
             We&apos;ll post changes here and notify firm admins of material ones. Questions:
-            [SUPPORT EMAIL] · [COMPANY LEGAL NAME], [ADDRESS].
+            info@thedigitaltutor.net · The Digital Tutor LLC, 3134 Decatur Ave, Bronx, NY 10467.
           </p>
         </section>
 
