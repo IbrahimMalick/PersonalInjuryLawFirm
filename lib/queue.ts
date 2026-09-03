@@ -7,7 +7,7 @@ import type { JobRow } from "./db/schema";
 // after() + cron) can coexist without double-processing. Jobs survive
 // restarts, fail with exponential backoff, and go "dead" after maxAttempts.
 
-export type JobType = "process_lead" | "send_message" | "transcribe_voicemail";
+export type JobType = "process_lead" | "send_message" | "transcribe_voicemail" | "sync_lead";
 
 export async function enqueue(
   type: JobType,

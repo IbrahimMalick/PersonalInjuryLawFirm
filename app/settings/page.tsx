@@ -91,6 +91,9 @@ export default async function SettingsPage({
             <Link href="/settings/conflicts" className="field-label text-manila hover:text-meter">
               Conflict list ▸
             </Link>
+            <Link href="/settings/integrations" className="field-label text-manila hover:text-meter">
+              Integrations ▸
+            </Link>
           </span>
         </div>
 

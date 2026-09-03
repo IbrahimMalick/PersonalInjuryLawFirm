@@ -160,12 +160,31 @@ export const messages = pgTable(
   (t) => [index("messages_lead_idx").on(t.leadId), index("messages_firm_idx").on(t.firmId)]
 );
 
+export const integrations = pgTable(
+  "integrations",
+  {
+    id: serial("id").primaryKey(),
+    firmId: integer("firm_id").notNull(),
+    provider: text("provider", {
+      enum: ["clio_grow", "lawmatics", "filevine", "mycase", "hubspot", "callrail", "webhook"],
+    }).notNull(),
+    // Provider credentials and options; OAuth providers also keep their token
+    // set in here ({ accessToken, refreshToken, expiresAt }).
+    config: jsonb("config").$type<Record<string, unknown>>().notNull().$defaultFn(() => ({})),
+    enabled: boolean("enabled").notNull().default(true),
+    lastSyncAt: text("last_sync_at"),
+    lastError: text("last_error"),
+    createdAt: text("created_at").notNull().$defaultFn(nowIso),
+  },
+  (t) => [uniqueIndex("integrations_firm_provider_idx").on(t.firmId, t.provider)]
+);
+
 export const jobs = pgTable(
   "jobs",
   {
     id: serial("id").primaryKey(),
     type: text("type", {
-      enum: ["process_lead", "send_message", "transcribe_voicemail"],
+      enum: ["process_lead", "send_message", "transcribe_voicemail", "sync_lead"],
     }).notNull(),
     payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
     status: text("status", { enum: ["pending", "running", "done", "failed", "dead"] })
@@ -207,3 +226,5 @@ export type AdversePartyRow = typeof adverseParties.$inferSelect;
 export type AuditRow = typeof auditEvents.$inferSelect;
 export type FirmRow = typeof firms.$inferSelect;
 export type AuthTokenRow = typeof authTokens.$inferSelect;
+export type IntegrationRow = typeof integrations.$inferSelect;
+export type IntegrationProvider = IntegrationRow["provider"];

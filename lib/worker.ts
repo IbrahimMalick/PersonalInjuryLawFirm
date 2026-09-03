@@ -1,6 +1,7 @@
 import { claimNext, completeJob, failJob, recoverStuckJobs } from "./queue";
 import { markLeadNeedsAttention, runProcessLead, runSendMessage } from "./pipeline";
 import { runTranscribeVoicemail } from "./channels/twilio";
+import { runSyncLead } from "./integrations";
 import type { JobRow } from "./db/schema";
 
 // Job execution, shared by two runtimes:
@@ -22,6 +23,9 @@ async function handle(job: JobRow): Promise<void> {
       await runTranscribeVoicemail(
         job.payload as { firmId: number; callSid: string; recordingUrl: string }
       );
+      break;
+    case "sync_lead":
+      await runSyncLead(job.payload);
       break;
   }
 }

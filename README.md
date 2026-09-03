@@ -66,6 +66,11 @@ flowchart LR
   in demo mode
 - Unconfigured channels run **visibly simulated** — the pipeline works end to end, marked
   "simulated" instead of pretending to deliver
+- **CRM sync rides beside the pipeline, never inside it.** Settings → Integrations pushes
+  every triaged lead into Clio Grow, HubSpot, Lawmatics, Filevine, MyCase, or a signed
+  generic webhook (GoHighLevel/Zapier) via retried queue jobs; CallRail's post-call webhook
+  feeds tracked calls in. A CRM outage can't block intake, and unconfigured integrations
+  run visibly simulated like everything else
 - Every consequential action — machine or human — lands in an append-only audit trail
 
 ## The CaseFile schema

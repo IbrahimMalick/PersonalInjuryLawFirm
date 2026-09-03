@@ -101,6 +101,15 @@ export default function Landing() {
           ))}
         </section>
 
+        {/* Works with the firm's stack */}
+        <section className="px-6 pb-12 max-w-[900px] mx-auto text-center">
+          <p className="field-label text-dim pb-3">Flows into what you already run</p>
+          <p className="font-mono text-[14px] text-inktext leading-loose">
+            Clio Grow · HubSpot · Lawmatics · Filevine · MyCase · GoHighLevel · CallRail ·
+            Zapier / webhooks
+          </p>
+        </section>
+
         {/* Versus answering services */}
         <section className="px-6 pb-16 max-w-[1000px] mx-auto">
           <h2 className="font-display font-bold uppercase tracking-wide text-2xl text-paper pb-3 text-center">

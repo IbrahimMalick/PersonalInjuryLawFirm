@@ -188,6 +188,26 @@ show as "simulated" until configured.
    `https://YOUR-DOMAIN/api/inbound/email?token=FIRM_TOKEN` — each firm's
    token is shown in `/operator`.
 
+## Step 10½ — Optional: CRM integrations
+
+Firms self-serve most of these in **Settings → Integrations** — no platform
+work needed: Clio Grow (Lead Inbox token), HubSpot (private-app token),
+Filevine (PAT), CallRail (paste the shown webhook URL into CallRail), and the
+generic webhook for GoHighLevel/Zapier. Two providers are OAuth-only and need
+platform developer apps before their Connect buttons work:
+
+- **Lawmatics**: email support@lawmatics.com to enable Developer Settings,
+  create an app with redirect URI
+  `https://YOUR-DOMAIN/api/integrations/lawmatics/callback`, then set
+  `LAWMATICS_CLIENT_ID` / `LAWMATICS_CLIENT_SECRET` in Vercel and redeploy.
+- **MyCase**: register a developer app (mycaseapi.stoplight.io) with redirect
+  URI `https://YOUR-DOMAIN/api/integrations/mycase/callback`, then set
+  `MYCASE_CLIENT_ID` / `MYCASE_CLIENT_SECRET` and redeploy.
+
+Until those env vars exist, the Lawmatics/MyCase cards honestly say
+"via onboarding call" and every other integration works normally. Use each
+card's **Send test lead** button to verify credentials end to end.
+
 ## Step 11 — Pre-launch checklist
 
 - [ ] `/terms` and `/privacy` reviewed by counsel; replace every

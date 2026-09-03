@@ -7,6 +7,7 @@ import { getFirmById } from "./firm";
 import type { CaseFile, Channel } from "./schema";
 import { sendViaChannel } from "./channels/outbound";
 import { syncLeadToGhl } from "./channels/ghl-sync";
+import { enqueueLeadSyncs } from "./integrations";
 
 // The live processing pipeline. Jobs land here from the worker.
 // Product rule: a real inquiry NEVER receives a cached/canned result — if
@@ -113,6 +114,8 @@ export async function runProcessLead(leadId: string): Promise<void> {
     firmName: firm.name,
     caseFile,
   });
+
+  await enqueueLeadSyncs(lead.firmId, leadId);
 }
 
 /** Called by the worker when a process_lead job exhausts its retries. */
@@ -143,6 +146,7 @@ export async function markLeadNeedsAttention(leadId: string, error: string): Pro
       caseFile: null,
       processingError: error,
     });
+    await enqueueLeadSyncs(lead.firmId, leadId);
   }
 }
 

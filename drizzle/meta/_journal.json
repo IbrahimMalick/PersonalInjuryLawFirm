@@ -8,6 +8,13 @@
       "when": 1788358830403,
       "tag": "0000_low_tigra",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788468416627,
+      "tag": "0001_hard_redwing",
+      "breakpoints": true
     }
   ]
 }
