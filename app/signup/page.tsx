@@ -120,7 +120,7 @@ export default async function SignupPage({
           )}
           <label className="block">
             <span className="field-label text-dim">Firm name</span>
-            <input name="firmName" required className={input} placeholder="Reyes & Cole" />
+            <input name="firmName" required className={input} placeholder="Your firm's name" />
           </label>
           <label className="block">
             <span className="field-label text-dim">Practice line</span>
