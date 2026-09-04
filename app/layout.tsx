@@ -21,8 +21,8 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Nightshift — Reyes & Cole Injury Law",
-  description: "24/7 AI intake engine for Reyes & Cole Injury Law (demo)",
+  title: "Nightshift",
+  description: "24/7 AI intake for personal-injury firms.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
