@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import IntakeSubmitButton from "@/components/IntakeSubmitButton";
 import { getFirmBySlug } from "@/lib/firm";
@@ -6,6 +7,9 @@ export const dynamic = "force-dynamic";
 
 // Public hosted intake form, one per firm — the link a firm puts behind the
 // "Contact us" button on their website. Plain HTML form, works without JS.
+// Kept out of search: firms link to it directly, and indexing would leak the
+// firm-slug namespace.
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default async function IntakeForm({
   params,
