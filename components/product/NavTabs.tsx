@@ -13,6 +13,7 @@ export default function NavTabs({
   const path = usePathname();
   const tabs = [
     { href: "/", label: "Inbox" },
+    { href: "/insights", label: "Insights" },
     { href: "/gap", label: "Cost of the Gap" },
     { href: "/guardrails", label: "Guardrails" },
     ...(isAdmin ? [{ href: "/settings", label: "Settings" }] : []),
