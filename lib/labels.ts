@@ -46,3 +46,14 @@ export const CHANNEL_LABEL: Record<string, string> = {
   webform: "Website form",
   whatsapp: "WhatsApp",
 };
+
+// What actually happened to a lead, recorded by a reviewer after the fact —
+// see leads.outcome. Independent of the model; used for accuracy reporting.
+export type Outcome = "signed" | "declined" | "lost" | "no_response";
+export const OUTCOMES: Outcome[] = ["signed", "declined", "lost", "no_response"];
+export const OUTCOME_LABEL: Record<Outcome, string> = {
+  signed: "Signed",
+  declined: "Declined",
+  lost: "Lost",
+  no_response: "No response",
+};

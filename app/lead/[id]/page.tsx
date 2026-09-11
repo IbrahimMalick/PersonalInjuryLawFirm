@@ -1,8 +1,10 @@
 import { asc, desc, eq } from "drizzle-orm";
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 import AppShell from "@/components/product/AppShell";
 import ReviewPanel from "@/components/product/ReviewPanel";
+import { audit } from "@/lib/audit";
 import { requireFirmUser } from "@/lib/auth";
 import { getDb, tables } from "@/lib/db";
 import { fmtDateTime } from "@/lib/format";
@@ -11,9 +13,12 @@ import {
   CASE_TYPE_LABEL,
   CHANNEL_LABEL,
   LANGUAGE_LABEL,
+  OUTCOME_LABEL,
+  OUTCOMES,
   ROUTING_LABEL,
   ROUTING_SENTENCE,
   TREATMENT_LABEL,
+  type Outcome,
 } from "@/lib/labels";
 import { isDemo } from "@/lib/mode";
 import { resolveReplyDestination } from "@/lib/reply";
@@ -22,6 +27,48 @@ import type { CaseFile } from "@/lib/schema";
 export const dynamic = "force-dynamic";
 
 const EMAIL_CHANNEL_LABELS: Record<string, string> = { ...CHANNEL_LABEL, email: "Email" };
+
+const OUTCOME_ACTIVE_CLASS: Record<Outcome, string> = {
+  signed: "border-ok bg-ok/10 text-ok",
+  declined: "border-ink-line bg-ink-line/25 text-inktext",
+  lost: "border-stamp bg-stamp/10 text-stamp",
+  no_response: "border-meter bg-meter/10 text-meter",
+};
+
+async function setOutcome(formData: FormData): Promise<void> {
+  "use server";
+  const { user, firm } = await requireFirmUser();
+  const leadId = String(formData.get("leadId") ?? "");
+  const raw = String(formData.get("outcome") ?? "");
+  const outcome = (OUTCOMES as string[]).includes(raw) ? (raw as Outcome) : null;
+
+  const db = await getDb();
+  const lead = (
+    await db
+      .select({ firmId: tables.leads.firmId })
+      .from(tables.leads)
+      .where(eq(tables.leads.id, leadId))
+      .limit(1)
+  )[0];
+  if (!lead || lead.firmId !== firm.id) redirect("/");
+
+  await db
+    .update(tables.leads)
+    .set({
+      outcome,
+      outcomeSetBy: outcome ? user.id : null,
+      outcomeSetAt: outcome ? new Date().toISOString() : null,
+    })
+    .where(eq(tables.leads.id, leadId));
+  await audit(outcome ? "lead.outcome_set" : "lead.outcome_cleared", {
+    firmId: firm.id,
+    leadId,
+    userId: user.id,
+    detail: { outcome },
+  });
+  revalidatePath(`/lead/${leadId}`);
+  revalidatePath("/insights");
+}
 
 export default async function LeadReview({ params }: { params: Promise<{ id: string }> }) {
   if (isDemo()) redirect("/demo");
@@ -65,6 +112,34 @@ export default async function LeadReview({ params }: { params: Promise<{ id: str
             {fmtDateTime(lead.receivedAt, firm.timezone)}
             {lead.processedAt ? ` · triaged ${fmtDateTime(lead.processedAt, firm.timezone)}` : ""}
           </span>
+        </div>
+
+        <div className="rounded-sm border border-ink-line bg-ink-raised px-5 py-3 mb-4 flex items-center gap-4 flex-wrap">
+          <span className="field-label text-dim shrink-0">Outcome</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            {OUTCOMES.map((key) => (
+              <form action={setOutcome} key={key}>
+                <input type="hidden" name="leadId" value={lead.id} />
+                <input type="hidden" name="outcome" value={lead.outcome === key ? "" : key} />
+                <button
+                  className={`field-label px-3 py-1.5 rounded-sm border transition-colors ${
+                    lead.outcome === key
+                      ? OUTCOME_ACTIVE_CLASS[key]
+                      : "border-ink-line text-dim hover:text-inktext hover:border-manila"
+                  }`}
+                  title={lead.outcome === key ? "Click to clear" : `Mark ${OUTCOME_LABEL[key]}`}
+                >
+                  {OUTCOME_LABEL[key]}
+                </button>
+              </form>
+            ))}
+          </div>
+          {lead.outcome && lead.outcomeSetAt && (
+            <span className="text-dim text-xs ml-auto">
+              set {fmtDateTime(lead.outcomeSetAt, firm.timezone)}
+              {lead.outcomeSetBy ? ` · user #${lead.outcomeSetBy}` : ""}
+            </span>
+          )}
         </div>
 
         <div className="grid grid-cols-[minmax(0,7fr)_minmax(0,5fr)] gap-4 items-start">

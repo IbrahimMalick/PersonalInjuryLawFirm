@@ -129,6 +129,12 @@ export const leads = pgTable(
     processingError: text("processing_error"),
     reviewedBy: integer("reviewed_by"),
     reviewedAt: text("reviewed_at"),
+    // What actually happened, marked by a reviewer after the fact — lets the
+    // firm (and Insights) see how well the AI's routing/priority predicted
+    // real outcomes. Unset until someone records it.
+    outcome: text("outcome", { enum: ["signed", "declined", "lost", "no_response"] }),
+    outcomeSetBy: integer("outcome_set_by"),
+    outcomeSetAt: text("outcome_set_at"),
   },
   (t) => [
     index("leads_firm_status_idx").on(t.firmId, t.status),

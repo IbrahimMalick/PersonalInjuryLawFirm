@@ -6,6 +6,7 @@ export interface InsightLead {
   channel: string;
   receivedAt: string; // ISO
   routing: string | null; // caseFile.routing, or null if not yet triaged
+  outcome: string | null; // what actually happened, set by a reviewer later
 }
 
 export interface InsightMessage {
@@ -139,6 +140,27 @@ export function categoryBreakdown(
       pct: total ? Math.round((count / total) * 1000) / 10 : 0,
     }))
     .sort((a, b) => b.count - a.count);
+}
+
+export interface SignNowAccuracy {
+  knownCount: number; // sign_now leads with a recorded outcome
+  signedCount: number;
+  pct: number | null; // null until knownCount > 0
+}
+
+/**
+ * Of the leads the AI routed "sign_now" that a reviewer has since marked with
+ * an outcome, what share actually signed? The one number that turns "trust
+ * the AI's scoring" into a checkable claim.
+ */
+export function signNowAccuracy(leads: InsightLead[]): SignNowAccuracy {
+  const known = leads.filter((l) => l.routing === "sign_now" && l.outcome !== null);
+  const signed = known.filter((l) => l.outcome === "signed").length;
+  return {
+    knownCount: known.length,
+    signedCount: signed,
+    pct: known.length ? Math.round((100 * signed) / known.length) : null,
+  };
 }
 
 export function fmtHours(h: number): string {

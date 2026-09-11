@@ -9,11 +9,12 @@ import {
   categoryBreakdown,
   fmtHours,
   overallMedianResponseHours,
+  signNowAccuracy,
   weeklyResponseTime,
   weeklyVolume,
   type InsightLead,
 } from "@/lib/insights";
-import { CHANNEL_LABEL, ROUTING_LABEL } from "@/lib/labels";
+import { CHANNEL_LABEL, OUTCOME_LABEL, ROUTING_LABEL } from "@/lib/labels";
 import { isDemo } from "@/lib/mode";
 import type { CaseFile } from "@/lib/schema";
 
@@ -23,6 +24,7 @@ const WEEKS = 12;
 const WINDOW_DAYS = WEEKS * 7;
 const ACTIONABLE_ROUTINGS = new Set(["sign_now", "schedule_consult"]);
 const CHANNEL_LABEL_ALL: Record<string, string> = { ...CHANNEL_LABEL, email: "Email" };
+const MIN_ACCURACY_SAMPLE = 3;
 
 const card = "rounded-sm border border-ink-line bg-ink-raised px-5 py-4";
 const h2 = "font-display font-bold uppercase tracking-wide text-lg text-paper pb-3";
@@ -59,6 +61,7 @@ export default async function InsightsPage() {
       receivedAt: tables.leads.receivedAt,
       status: tables.leads.status,
       caseFile: tables.leads.caseFile,
+      outcome: tables.leads.outcome,
     })
     .from(tables.leads)
     .where(and(eq(tables.leads.firmId, firm.id), gt(tables.leads.receivedAt, since)));
@@ -68,6 +71,7 @@ export default async function InsightsPage() {
     channel: r.channel,
     receivedAt: r.receivedAt,
     routing: r.caseFile ? ((r.caseFile as unknown as CaseFile).routing ?? null) : null,
+    outcome: r.outcome,
   }));
 
   const leadIds = leads.map((l) => l.id);
@@ -98,6 +102,12 @@ export default async function InsightsPage() {
     leads.map((l) => l.channel),
     CHANNEL_LABEL_ALL
   );
+  const outcomeBreakdown = categoryBreakdown(
+    leads.map((l) => l.outcome),
+    OUTCOME_LABEL
+  );
+  const accuracy = signNowAccuracy(leads);
+  const outcomeKnownCount = leads.filter((l) => l.outcome !== null).length;
 
   return (
     <AppShell user={user} firm={firm}>
@@ -165,6 +175,30 @@ export default async function InsightsPage() {
             <div className={card}>
               <h2 className={h2}>Channel mix</h2>
               <CategoryBarList items={channelMix} />
+            </div>
+
+            <div className={`${card} col-span-2`}>
+              <div className="flex items-baseline justify-between pb-3">
+                <h2 className="font-display font-bold uppercase tracking-wide text-lg text-paper">
+                  Outcomes
+                </h2>
+                <span className="font-mono text-sm text-dim">
+                  {outcomeKnownCount} of {triagedCount} triaged leads marked
+                </span>
+              </div>
+              {accuracy.knownCount >= MIN_ACCURACY_SAMPLE ? (
+                <p className="text-[15px] text-inktext mb-3">
+                  Of <span className="text-manila font-semibold">{accuracy.knownCount}</span>{" "}
+                  &ldquo;Sign now&rdquo; leads with a recorded outcome,{" "}
+                  <span className="text-ok font-semibold">{accuracy.pct}%</span> actually signed.
+                </p>
+              ) : (
+                <p className="text-dim text-sm mb-3">
+                  Mark outcomes on &ldquo;Sign now&rdquo; leads (at least {MIN_ACCURACY_SAMPLE}) to
+                  see how well the AI&apos;s routing predicts real signups.
+                </p>
+              )}
+              <CategoryBarList items={outcomeBreakdown} emptyText="No outcomes recorded yet — mark one from a lead's review screen." />
             </div>
 
             <div className={`${card} col-span-2`}>
