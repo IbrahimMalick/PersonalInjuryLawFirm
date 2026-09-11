@@ -171,7 +171,7 @@ export const jobs = pgTable(
   {
     id: serial("id").primaryKey(),
     type: text("type", {
-      enum: ["process_lead", "send_message", "transcribe_voicemail"],
+      enum: ["process_lead", "send_message", "transcribe_voicemail", "escalate_lead"],
     }).notNull(),
     payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
     status: text("status", { enum: ["pending", "running", "done", "failed", "dead"] })

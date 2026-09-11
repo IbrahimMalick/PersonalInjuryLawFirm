@@ -1,9 +1,11 @@
 import { and, eq } from "drizzle-orm";
 import { audit } from "./audit";
+import { ESCALATION_DELAY_SECONDS, notifyEscalation, notifyHighPriorityLead } from "./alerts";
 import { getDb, tables } from "./db";
 import type { LeadRow } from "./db/schema";
 import { buildCaseFile, extractModelOutput, type ExtractionInput } from "./extract";
 import { getFirmById } from "./firm";
+import { enqueue } from "./queue";
 import type { CaseFile, Channel } from "./schema";
 import { sendViaChannel } from "./channels/outbound";
 import { syncLeadToGhl } from "./channels/ghl-sync";
@@ -104,6 +106,16 @@ export async function runProcessLead(leadId: string): Promise<void> {
     await audit("conflict.flagged", { firmId: lead.firmId, leadId, detail: { match: flag } });
   }
 
+  // The AI read this at 3 AM — that only matters if a person finds out now,
+  // not whenever they next happen to open the inbox. Never let an alert
+  // failure fail the triage that already succeeded.
+  if (caseFile.routing === "sign_now") {
+    await notifyHighPriorityLead(lead, caseFile, firm.name).catch((e) =>
+      console.error(`[alerts] notify failed for ${leadId}: ${(e as Error).message}`)
+    );
+    await enqueue("escalate_lead", { leadId }, { delaySeconds: ESCALATION_DELAY_SECONDS });
+  }
+
   await syncLeadToGhl({
     leadId,
     channel: lead.channel,
@@ -144,6 +156,43 @@ export async function markLeadNeedsAttention(leadId: string, error: string): Pro
       processingError: error,
     });
   }
+}
+
+/**
+ * Fires ESCALATION_DELAY_SECONDS after a "sign_now" lead is triaged. A no-op
+ * if it's since been replied to, archived, or re-triaged away from sign_now
+ * — so re-running triage on the same lead can leave a stale reminder queued
+ * without it saying anything wrong.
+ */
+export async function runEscalateLead(leadId: string): Promise<void> {
+  const db = await getDb();
+  const lead = (
+    await db.select().from(tables.leads).where(eq(tables.leads.id, leadId)).limit(1)
+  )[0];
+  if (!lead || lead.status === "archived") return;
+
+  const replied = (
+    await db
+      .select({ id: tables.messages.id })
+      .from(tables.messages)
+      .where(eq(tables.messages.leadId, leadId))
+      .limit(1)
+  )[0];
+  if (replied) return;
+
+  const caseFile = (lead.caseFile as unknown as CaseFile | null) ?? null;
+  if (!caseFile || caseFile.routing !== "sign_now") return;
+
+  const firm = await getFirmById(lead.firmId);
+  if (!firm) return;
+
+  const receivedMs = new Date(
+    lead.receivedAt.endsWith("Z") ? lead.receivedAt : lead.receivedAt + "Z"
+  ).getTime();
+  const waitedMinutes = Math.round((Date.now() - receivedMs) / 60_000);
+
+  await notifyEscalation(lead, caseFile, firm.name, waitedMinutes);
+  await audit("lead.escalated", { firmId: lead.firmId, leadId, detail: { waitedMinutes } });
 }
 
 export async function runSendMessage(messageId: number): Promise<void> {
