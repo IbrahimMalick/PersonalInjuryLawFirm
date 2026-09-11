@@ -110,9 +110,12 @@ export async function runProcessLead(leadId: string): Promise<void> {
   // not whenever they next happen to open the inbox. Never let an alert
   // failure fail the triage that already succeeded.
   if (caseFile.routing === "sign_now") {
-    await notifyHighPriorityLead(lead, caseFile, firm.name).catch((e) =>
-      console.error(`[alerts] notify failed for ${leadId}: ${(e as Error).message}`)
-    );
+    try {
+      await notifyHighPriorityLead(lead, caseFile, firm.name);
+      await audit("lead.alert_sent", { firmId: lead.firmId, leadId, detail: { channel: "email" } });
+    } catch (e) {
+      console.error(`[alerts] notify failed for ${leadId}: ${(e as Error).message}`);
+    }
     await enqueue("escalate_lead", { leadId }, { delaySeconds: ESCALATION_DELAY_SECONDS });
   }
 
