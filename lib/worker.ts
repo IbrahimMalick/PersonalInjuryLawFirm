@@ -1,5 +1,10 @@
 import { claimNext, completeJob, failJob, recoverStuckJobs } from "./queue";
-import { markLeadNeedsAttention, runProcessLead, runSendMessage } from "./pipeline";
+import {
+  markLeadNeedsAttention,
+  runEscalateLead,
+  runProcessLead,
+  runSendMessage,
+} from "./pipeline";
 import { runTranscribeVoicemail } from "./channels/twilio";
 import type { JobRow } from "./db/schema";
 
@@ -22,6 +27,9 @@ async function handle(job: JobRow): Promise<void> {
       await runTranscribeVoicemail(
         job.payload as { firmId: number; callSid: string; recordingUrl: string }
       );
+      break;
+    case "escalate_lead":
+      await runEscalateLead(String(job.payload.leadId));
       break;
   }
 }
