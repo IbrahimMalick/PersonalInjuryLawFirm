@@ -75,8 +75,10 @@ function median(sortedAsc: number[]): number {
   return n % 2 ? sortedAsc[mid] : (sortedAsc[mid - 1] + sortedAsc[mid]) / 2;
 }
 
+type LeadTiming = Pick<InsightLead, "id" | "receivedAt">;
+
 /** Hours from a lead's arrival to a human approving its reply, per lead that has one. */
-function responseHours(leads: InsightLead[], messages: InsightMessage[]): Map<string, number> {
+function responseHours(leads: LeadTiming[], messages: InsightMessage[]): Map<string, number> {
   const approvedAt = new Map(messages.map((m) => [m.leadId, m.approvedAt]));
   const out = new Map<string, number>();
   for (const lead of leads) {
@@ -89,7 +91,7 @@ function responseHours(leads: InsightLead[], messages: InsightMessage[]): Map<st
 }
 
 export function overallMedianResponseHours(
-  leads: InsightLead[],
+  leads: LeadTiming[],
   messages: InsightMessage[]
 ): number | null {
   const hours = [...responseHours(leads, messages).values()].sort((a, b) => a - b);
@@ -97,7 +99,7 @@ export function overallMedianResponseHours(
 }
 
 export function weeklyResponseTime(
-  leads: InsightLead[],
+  leads: LeadTiming[],
   messages: InsightMessage[],
   weeks: number,
   now: Date = new Date()
@@ -160,6 +162,38 @@ export function signNowAccuracy(leads: InsightLead[]): SignNowAccuracy {
     knownCount: known.length,
     signedCount: signed,
     pct: known.length ? Math.round((100 * signed) / known.length) : null,
+  };
+}
+
+export interface DigestLeadRow {
+  id: string;
+  receivedAt: string;
+  routing: string | null;
+  status: string;
+}
+
+export interface WeeklyDigestSummary {
+  totalLeads: number;
+  signNowCount: number;
+  triagedCount: number;
+  repliedCount: number;
+  medianReplyHours: number | null;
+  needsAttentionCount: number;
+}
+
+/** The numbers behind the weekly digest email — same shape regardless of window length. */
+export function weeklyDigestSummary(
+  leads: DigestLeadRow[],
+  messages: InsightMessage[]
+): WeeklyDigestSummary {
+  const repliedIds = new Set(messages.map((m) => m.leadId));
+  return {
+    totalLeads: leads.length,
+    signNowCount: leads.filter((l) => l.routing === "sign_now").length,
+    triagedCount: leads.filter((l) => l.routing !== null).length,
+    repliedCount: leads.filter((l) => repliedIds.has(l.id)).length,
+    medianReplyHours: overallMedianResponseHours(leads, messages),
+    needsAttentionCount: leads.filter((l) => l.status === "needs_attention").length,
   };
 }
 
