@@ -12,6 +12,7 @@ import { isDemo } from "@/lib/mode";
 import { fmtDateTime, agoLabel } from "@/lib/format";
 import { CASE_TYPE_LABEL, ROUTING_LABEL } from "@/lib/labels";
 import type { CaseFile } from "@/lib/schema";
+import { leadUrgency, type Urgency } from "@/lib/urgency";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,12 @@ const CHANNEL_GLYPH: Record<string, string> = {
   webform: "WEB",
   email: "EM",
 };
+
+function urgencyRowClass(urgency: Urgency, needsEyes: boolean): string {
+  if (urgency === "red") return "border-stamp/70 bg-stamp/5";
+  if (urgency === "amber") return "border-meter/50 bg-meter/5";
+  return needsEyes ? "border-ink-line" : "border-ink-line/50 opacity-80";
+}
 
 function StatusChip({
   status,
@@ -190,12 +197,25 @@ export default async function Inbox() {
     : [];
   const replied = new Set(repliedRows.map((r) => r.leadId));
 
+  const leadsWithMeta = leads.map((lead) => {
+    const cf = (lead.caseFile as unknown as CaseFile | null) ?? null;
+    const needsEyes =
+      lead.status === "needs_attention" || (lead.status === "triaged" && !replied.has(lead.id));
+    const urgency = leadUrgency({
+      needsEyes,
+      receivedAt: lead.receivedAt,
+      routing: cf?.routing ?? null,
+    });
+    return { lead, cf, needsEyes, urgency };
+  });
+
   const counts = {
     waiting: leads.filter(
       (l) => l.status === "triaged" && !replied.has(l.id)
     ).length,
     attention: leads.filter((l) => l.status === "needs_attention").length,
     reading: leads.filter((l) => l.status === "received" || l.status === "processing").length,
+    overdue: leadsWithMeta.filter((l) => l.urgency === "red").length,
   };
 
   return (
@@ -213,6 +233,9 @@ export default async function Inbox() {
         <div className="flex items-center justify-between pb-3">
           <div className="flex items-center gap-5 font-mono text-sm">
             <span className="text-manila">{counts.waiting} awaiting review</span>
+            {counts.overdue > 0 && (
+              <span className="text-stamp font-semibold">⏱ {counts.overdue} overdue</span>
+            )}
             {counts.attention > 0 && (
               <span className="text-stamp">{counts.attention} need attention</span>
             )}
@@ -235,18 +258,12 @@ export default async function Inbox() {
           </div>
         ) : (
           <div className="space-y-2">
-            {leads.map((lead) => {
-              const cf = (lead.caseFile as unknown as CaseFile | null) ?? null;
-              const needsEyes =
-                lead.status === "needs_attention" ||
-                (lead.status === "triaged" && !replied.has(lead.id));
+            {leadsWithMeta.map(({ lead, cf, needsEyes, urgency }) => {
               return (
                 <Link
                   key={lead.id}
                   href={`/lead/${lead.id}`}
-                  className={`grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-4 rounded-sm border px-4 py-3 bg-ink-raised transition-colors hover:border-manila ${
-                    needsEyes ? "border-ink-line" : "border-ink-line/50 opacity-80"
-                  }`}
+                  className={`grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-4 rounded-sm border px-4 py-3 bg-ink-raised transition-colors hover:border-manila ${urgencyRowClass(urgency, needsEyes)}`}
                 >
                   <span className="font-mono text-xs text-dim border border-ink-line rounded-sm text-center py-1">
                     {CHANNEL_GLYPH[lead.channel] ?? lead.channel}
@@ -273,7 +290,16 @@ export default async function Inbox() {
                       caseFile={cf}
                       replied={replied.has(lead.id)}
                     />
-                    <span className="block font-mono text-xs text-dim mt-1">
+                    <span
+                      className={`block font-mono text-xs mt-1 ${
+                        urgency === "red"
+                          ? "text-stamp font-semibold"
+                          : urgency === "amber"
+                            ? "text-meter"
+                            : "text-dim"
+                      }`}
+                    >
+                      {urgency !== "none" && "⏱ "}
                       {fmtDateTime(lead.receivedAt, firm.timezone)} · {agoLabel(lead.receivedAt)}
                     </span>
                   </span>
