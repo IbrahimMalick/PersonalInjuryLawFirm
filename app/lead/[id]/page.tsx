@@ -99,6 +99,10 @@ export default async function LeadReview({ params }: { params: Promise<{ id: str
   const lang = cf?.claimant.preferredLanguage ?? "en";
   const destination = cf ? resolveReplyDestination(lead, cf) : null;
   const solAcknowledged = Boolean(firm.solAcknowledgedAt);
+  const metaRecord = (lead.meta as Record<string, unknown>) ?? {};
+  const attachments = Array.isArray(metaRecord.attachments)
+    ? (metaRecord.attachments as unknown[]).filter((u): u is string => typeof u === "string")
+    : [];
 
   return (
     <AppShell user={user} firm={firm}>
@@ -311,6 +315,38 @@ export default async function LeadReview({ params }: { params: Promise<{ id: str
                 <p className="font-mono text-sm text-manila mt-2">
                   Recording: {String((lead.meta as Record<string, unknown>).recordingUrl)}
                 </p>
+              )}
+              {attachments.length > 0 && (
+                <div className="mt-3">
+                  <div className="field-label text-dim pb-1.5">
+                    Attachments ({attachments.length})
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {attachments.map((url, i) => (
+                      <a
+                        key={url}
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block w-20 h-20 rounded-sm border border-ink-line overflow-hidden bg-ink hover:border-manila shrink-0"
+                        title={`Attachment ${i + 1}`}
+                      >
+                        {/\.pdf(\?|$)/i.test(url) ? (
+                          <span className="flex items-center justify-center h-full text-dim text-xs font-mono">
+                            PDF
+                          </span>
+                        ) : (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={url}
+                            alt={`Attachment ${i + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        )}
+                      </a>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
 

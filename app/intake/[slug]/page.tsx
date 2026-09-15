@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import IntakeSubmitButton from "@/components/IntakeSubmitButton";
+import { blobConfigured } from "@/lib/blob";
 import { getFirmBySlug } from "@/lib/firm";
 
 export const dynamic = "force-dynamic";
@@ -61,6 +62,7 @@ export default async function IntakeForm({
           <form
             method="POST"
             action={`/api/inbound/webform?redirect=1&firm=${firm.slug}`}
+            encType="multipart/form-data"
             className="px-8 py-6 space-y-4"
           >
             <p className="text-[15px] leading-snug">
@@ -91,6 +93,23 @@ export default async function IntakeForm({
               <span className="field-label text-paperdim">What happened?</span>
               <textarea name="message" rows={6} className={input} />
             </label>
+            {blobConfigured() && (
+              <label className="block">
+                <span className="field-label text-paperdim">
+                  Photos or documents (optional)
+                </span>
+                <input
+                  type="file"
+                  name="attachments"
+                  multiple
+                  accept="image/*,.pdf"
+                  className="w-full text-[15px] text-papertext file:mr-3 file:rounded-sm file:border-0 file:bg-carbon file:text-paper file:px-3 file:py-2 file:font-display file:font-bold file:uppercase file:tracking-wide file:cursor-pointer"
+                />
+                <span className="block text-[13px] text-paperdim mt-1">
+                  Accident or injury photos, a police report — up to 5 files, 8MB each.
+                </span>
+              </label>
+            )}
             {/* Honeypot + render timestamp (spam defenses) */}
             <input
               name="website"
