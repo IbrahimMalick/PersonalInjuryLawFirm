@@ -15,7 +15,8 @@ import type { CaseFile } from "./schema";
 
 export const ESCALATION_DELAY_SECONDS = 30 * 60;
 
-async function firmRecipients(firmId: number): Promise<string[]> {
+/** Every active (non-disabled) user's email at a firm — also used by the weekly digest. */
+export async function firmRecipients(firmId: number): Promise<string[]> {
   const db = await getDb();
   const rows = await db
     .select({ email: tables.users.email })

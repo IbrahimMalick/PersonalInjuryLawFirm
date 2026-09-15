@@ -39,6 +39,9 @@ export const firms = pgTable(
     solAcknowledgedAt: text("sol_acknowledged_at"),
     solAcknowledgedBy: integer("sol_acknowledged_by"),
     onboardingDismissedAt: text("onboarding_dismissed_at"),
+    // Idempotency guard for the weekly digest cron — also lets us skip a firm
+    // that already got this week's email if the cron fires more than once.
+    lastDigestSentAt: text("last_digest_sent_at"),
     createdAt: text("created_at").notNull().$defaultFn(nowIso),
   },
   (t) => [

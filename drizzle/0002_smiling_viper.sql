@@ -1,0 +1,1 @@
+ALTER TABLE "firms" ADD COLUMN "last_digest_sent_at" text;
