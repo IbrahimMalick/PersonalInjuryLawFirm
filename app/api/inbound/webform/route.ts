@@ -28,11 +28,15 @@ export async function POST(request: Request) {
   const url = new URL(request.url);
   const wantsRedirect = url.searchParams.get("redirect") === "1";
   const slug = url.searchParams.get("firm") ?? "";
+  const lang = url.searchParams.get("lang") === "es" ? "es" : null;
   const firm = await getFirmBySlug(slug);
   if (!firm) return NextResponse.json({ error: "Unknown firm" }, { status: 404 });
   const done = () =>
     wantsRedirect
-      ? NextResponse.redirect(new URL(`/intake/${firm.slug}?sent=1`, request.url), 303)
+      ? NextResponse.redirect(
+          new URL(`/intake/${firm.slug}?sent=1${lang ? `&lang=${lang}` : ""}`, request.url),
+          303
+        )
       : NextResponse.json({ ok: true });
 
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
