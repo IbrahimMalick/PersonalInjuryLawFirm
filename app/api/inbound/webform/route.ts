@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { uploadAttachments } from "@/lib/blob";
 import { ingestLead } from "@/lib/channels/inbound";
 import { getFirmBySlug } from "@/lib/firm";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30; // room for a few file uploads
 
 // Public endpoint for the hosted intake form and the embeddable snippet.
 // Spam defenses: honeypot field, minimum-fill-time check, per-IP rate limit.
@@ -39,6 +41,7 @@ export async function POST(request: Request) {
   }
 
   let fields: Record<string, string>;
+  const attachmentFiles: File[] = [];
   const contentType = request.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) {
     fields = (await request.json()) as Record<string, string>;
@@ -47,6 +50,7 @@ export async function POST(request: Request) {
     fields = {};
     form.forEach((v, k) => {
       if (typeof v === "string") fields[k] = v;
+      else if (k === "attachments" && v.size > 0) attachmentFiles.push(v);
     });
   }
 
@@ -69,6 +73,8 @@ export async function POST(request: Request) {
   if (!message && !firstName && !phone && !email) {
     return NextResponse.json({ error: "Empty submission" }, { status: 400 });
   }
+
+  const { urls: attachments } = await uploadAttachments(attachmentFiles, `intake/${firm.slug}`);
 
   const raw = [
     `First name: ${firstName || "(blank)"}`,
@@ -93,6 +99,7 @@ export async function POST(request: Request) {
         "How can we help?": message,
       },
       ip,
+      ...(attachments.length > 0 ? { attachments } : {}),
     },
   });
 

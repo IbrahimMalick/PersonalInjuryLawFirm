@@ -20,6 +20,7 @@ export interface ExtractionInput {
     photos?: string[];
     formFields?: Record<string, string>;
     subject?: string;
+    attachments?: string[];
   };
   receivedLabel: string;
   breakIt?: boolean; // demo-only choreography flag
@@ -83,7 +84,7 @@ function buildPrompt(
   const channelDesc: Record<string, string> = {
     voicemail: `Voicemail transcript from ${input.from}${dur ? ` (${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, "0")})` : ""}`,
     sms: `SMS from ${input.from}`,
-    webform: `Website contact form submission (${input.from})`,
+    webform: `Website contact form submission (${input.from})${input.meta?.attachments?.length ? ` with ${input.meta.attachments.length} attachment(s) provided (photos and/or a document)` : ""}`,
     whatsapp: `WhatsApp message from ${input.displayName ?? "unknown"} (${input.from})${input.meta?.photos?.length ? ` with ${input.meta.photos.length} photo attachments: ${input.meta.photos.join(", ")}` : ""}`,
     email: `Email from ${input.displayName ? `${input.displayName} <${input.from}>` : input.from}${input.meta?.subject ? ` — subject: ${input.meta.subject}` : ""}`,
   };
