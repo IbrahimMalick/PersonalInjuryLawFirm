@@ -102,6 +102,22 @@ export function isOperator(user: UserRow): boolean {
   return list.includes(user.email.toLowerCase());
 }
 
+/**
+ * Marketing dashboard viewers: normal accounts whose email is allowlisted in
+ * MARKETING_EMAILS, plus operators (who already see everything). This is
+ * deliberately NOT the per-firm `role` column — that column belongs to a
+ * tenant's own staff (every paying firm has an "admin"), and the marketing
+ * dashboard shows cross-firm business metrics that no tenant should see.
+ */
+export function isMarketingViewer(user: UserRow): boolean {
+  if (isOperator(user)) return true;
+  const list = (process.env.MARKETING_EMAILS ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  return list.includes(user.email.toLowerCase());
+}
+
 /** Route-handler guard: returns null instead of redirecting. */
 export async function apiUser(role?: "admin"): Promise<UserRow | null> {
   const user = await currentUser();

@@ -14,6 +14,7 @@ export default function robots(): MetadataRoute.Robots {
       disallow: [
         "/api/",
         "/operator",
+        "/marketing",
         "/settings",
         "/lead/",
         "/archive",

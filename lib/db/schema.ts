@@ -35,6 +35,10 @@ export const firms = pgTable(
     stripeSubscriptionId: text("stripe_subscription_id"),
     subscriptionStatus: text("subscription_status"), // trialing|active|past_due|canceled
     trialEndsAt: text("trial_ends_at"),
+    // Set once, the first time a firm's checkout completes — the trial->paid
+    // conversion moment. Powers the marketing dashboard's conversion timing;
+    // never cleared on cancel, since "did they ever convert" stays true.
+    convertedAt: text("converted_at"),
     // The SOL table ships as code; an attorney at THIS firm must acknowledge it.
     solAcknowledgedAt: text("sol_acknowledged_at"),
     solAcknowledgedBy: integer("sol_acknowledged_by"),
