@@ -6,9 +6,11 @@ import { usePathname } from "next/navigation";
 export default function NavTabs({
   isAdmin,
   isOperator,
+  isMarketing,
 }: {
   isAdmin: boolean;
   isOperator?: boolean;
+  isMarketing?: boolean;
 }) {
   const path = usePathname();
   const tabs = [
@@ -18,6 +20,7 @@ export default function NavTabs({
     { href: "/guardrails", label: "Guardrails" },
     ...(isAdmin ? [{ href: "/settings", label: "Settings" }] : []),
     ...(isOperator ? [{ href: "/operator", label: "Operator" }] : []),
+    ...(isMarketing ? [{ href: "/marketing", label: "Marketing" }] : []),
   ];
   return (
     <nav className="flex items-end gap-1 h-full" aria-label="Screens">

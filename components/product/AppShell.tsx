@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { and, eq, inArray, notInArray } from "drizzle-orm";
-import { currentUser, destroySession, isOperator } from "@/lib/auth";
+import { currentUser, destroySession, isMarketingViewer, isOperator } from "@/lib/auth";
 import { sendVerificationEmail } from "@/lib/auth-tokens";
 import { firmBillingState } from "@/lib/billing";
 import type { FirmRow, UserRow } from "@/lib/db/schema";
@@ -94,7 +94,11 @@ export default async function AppShell({
           <RealMeter oldestReceivedAt={oldest} timezone={firm.timezone} />
         </div>
         <div className="self-end flex items-end gap-4">
-          <NavTabs isAdmin={user.role === "admin"} isOperator={isOperator(user)} />
+          <NavTabs
+            isAdmin={user.role === "admin"}
+            isOperator={isOperator(user)}
+            isMarketing={isMarketingViewer(user)}
+          />
         </div>
       </header>
       {!user.emailVerifiedAt && (

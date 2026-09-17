@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { audit } from "@/lib/audit";
@@ -54,6 +54,12 @@ export async function POST(request: Request) {
             subscriptionStatus: "active",
           })
           .where(eq(tables.firms.id, firmId));
+        // First-time-only: the moment a firm ever converts, for the marketing
+        // dashboard's trend chart. Untouched on resubscribe or plan changes.
+        await db
+          .update(tables.firms)
+          .set({ convertedAt: new Date().toISOString() })
+          .where(and(eq(tables.firms.id, firmId), isNull(tables.firms.convertedAt)));
         await audit("billing.subscribed", { firmId, detail: { event: event.id } });
       }
       break;
