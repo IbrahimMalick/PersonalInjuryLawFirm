@@ -55,6 +55,28 @@ const CARDS = [
   },
 ];
 
+const PIPELINE = [
+  { n: "01", title: "Capture", body: "Every channel lands in one desk — voicemail, text, WhatsApp, email, the web form." },
+  { n: "02", title: "Structure", body: "The raw message becomes a case file: injuries, treatment status, liability, priority score." },
+  { n: "03", title: "Verify", body: "Checked against your conflict list and the reviewed deadline table — never guessed by the AI." },
+  { n: "04", title: "Approve & send", body: "A person at your firm reviews the drafted reply, edits if needed, and clicks send." },
+];
+
+const SEGMENTS = [
+  {
+    title: "Solo practitioners",
+    body: "Capture every after-hours call without hiring overnight staff — the desk runs while you're in court or asleep.",
+  },
+  {
+    title: "Small firms",
+    body: "One shared inbox across the whole team, so a lead never sits unclaimed between attorneys or gets worked twice.",
+  },
+  {
+    title: "Growing firms",
+    body: "Add reviewers under Settings as you hire — every new person triages against the same conflict list and deadline table from day one, no retraining a receptionist.",
+  },
+];
+
 const STEPS = [
   {
     n: "01",
@@ -283,6 +305,49 @@ export default function Landing() {
                   {c.title}
                 </h3>
                 <p className="text-[15px] text-dim leading-relaxed">{c.body}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 rounded-sm border border-ink-line bg-ink-raised px-5 py-6">
+            <div className="field-label text-dim mb-4">Where every lead goes, every time</div>
+            <div className="grid sm:grid-cols-4 gap-3 sm:gap-0 sm:items-stretch">
+              {PIPELINE.map((p, i) => (
+                <div key={p.n} className="flex sm:items-center">
+                  <div className="flex-1">
+                    <span className="font-mono text-meter text-xs">{p.n}</span>
+                    <div className="font-display font-bold uppercase tracking-wide text-[15px] text-paper mt-1">
+                      {p.title}
+                    </div>
+                    <p className="text-[13px] text-dim leading-snug mt-1">{p.body}</p>
+                  </div>
+                  {i < PIPELINE.length - 1 && (
+                    <span
+                      className="hidden sm:block text-ink-line font-mono text-lg px-2 shrink-0"
+                      aria-hidden
+                    >
+                      →
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </Section>
+
+        {/* Who it's for */}
+        <Section className="py-14">
+          <Eyebrow>Built for your firm&apos;s size</Eyebrow>
+          <h2 className="font-display font-bold uppercase tracking-wide text-3xl text-paper max-w-2xl leading-tight mb-8">
+            The same desk, whether it&apos;s you or a growing team.
+          </h2>
+          <div className="grid md:grid-cols-3 gap-4">
+            {SEGMENTS.map((s) => (
+              <div key={s.title} className="rounded-sm border border-ink-line bg-ink-raised px-5 py-5">
+                <h3 className="font-display font-bold uppercase tracking-wide text-lg text-paper mb-2">
+                  {s.title}
+                </h3>
+                <p className="text-[15px] text-dim leading-relaxed">{s.body}</p>
               </div>
             ))}
           </div>
