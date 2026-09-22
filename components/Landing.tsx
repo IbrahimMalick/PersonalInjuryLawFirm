@@ -181,8 +181,8 @@ function Foot() {
 export default function Landing() {
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="flex items-center justify-between px-6 py-4">
-        <span className="flex items-center gap-3">
+      <header className="flex items-center justify-between px-6 py-4 gap-4">
+        <span className="flex items-center gap-3 shrink-0">
           <span className="grid place-items-center w-9 h-9 rounded-sm border-2 border-meter text-meter font-display font-bold text-lg">
             N
           </span>
@@ -190,7 +190,15 @@ export default function Landing() {
             Nightshift
           </span>
         </span>
-        <span className="flex items-center gap-4">
+        <nav className="hidden md:flex items-center gap-6" aria-label="Page sections">
+          <a href="#how-it-works" className="field-label text-dim hover:text-inktext">
+            How it works
+          </a>
+          <a href="#faq" className="field-label text-dim hover:text-inktext">
+            FAQ
+          </a>
+        </nav>
+        <span className="flex items-center gap-4 shrink-0">
           <Link href="/login" className="field-label text-dim hover:text-inktext">
             Sign in
           </Link>
@@ -415,7 +423,7 @@ export default function Landing() {
         </Section>
 
         {/* FAQ */}
-        <Section className="py-14">
+        <Section id="faq" className="py-14">
           <Eyebrow>Before you sign up</Eyebrow>
           <h2 className="font-display font-bold uppercase tracking-wide text-3xl text-paper max-w-2xl leading-tight mb-8">
             Questions firms ask us first
