@@ -12,6 +12,15 @@ const CHANNELS = [
   { glyph: "WEB", label: "Web form" },
 ];
 
+const HERO_CHECKLIST = [
+  "Reads voicemail, text, WhatsApp, email, and your web form",
+  "Builds a structured case file automatically",
+  "Checks conflicts and computes the filing deadline",
+  "Drafts the reply — a human approves every send",
+];
+
+const HERO_STAGES = ["Captured", "Structured", "Verified", "Approved"];
+
 const GUARANTEES = [
   { mark: "☑", text: "Nothing sends without a human clicking approve" },
   { mark: "⏱", text: "Deadlines computed from a reviewed table — never guessed by AI" },
@@ -200,15 +209,27 @@ export default function Landing() {
           <div className="grid lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] gap-10 items-center">
             <div>
               <div className="font-mono text-meter text-xl tabular-nums pb-3">3:12 AM</div>
-              <h1 className="font-display font-bold uppercase tracking-wide text-4xl sm:text-5xl text-paper leading-[1.05]">
-                Somebody just called your firm about a car accident.
+              <h1 className="font-display font-bold uppercase tracking-wide text-4xl sm:text-5xl leading-[1.05]">
+                <span className="text-paper">Somebody just called your firm</span>
+                <br />
+                <span className="text-manila">about a car accident.</span>
               </h1>
               <p className="text-dim text-lg mt-5 max-w-xl leading-relaxed">
                 Nobody answers a law office at 3:12 AM — so that case signs with whoever answers
-                first. Nightshift reads every after-hours voicemail, text, email, and web form,
-                builds the case file, checks your conflicts, and drafts the reply.{" "}
+                first.{" "}
                 <span className="text-inktext">A person at your firm approves everything.</span>
               </p>
+
+              <ul className="mt-6 space-y-2.5 max-w-md">
+                {HERO_CHECKLIST.map((item) => (
+                  <li key={item} className="flex gap-2.5 items-start text-[15px]">
+                    <span className="text-ok font-mono leading-[1.4]" aria-hidden>
+                      ☑
+                    </span>
+                    <span className="text-inktext leading-snug">{item}</span>
+                  </li>
+                ))}
+              </ul>
 
               <div className="flex flex-wrap items-center gap-3 mt-8">
                 <Link
@@ -243,6 +264,7 @@ export default function Landing() {
             </div>
 
             <div>
+              <div className="field-label text-manila mb-3">Real case file, not a mockup</div>
               <div className="rounded-sm border border-ink-line bg-ink-raised p-2 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.6)]">
                 <Image
                   src="/screenshot.png"
@@ -253,9 +275,26 @@ export default function Landing() {
                   priority
                 />
               </div>
-              <p className="field-label text-dim mt-3 text-center">
-                The actual product — a real case file, built from a real voicemail
-              </p>
+              <div className="grid grid-cols-4 gap-2 mt-3">
+                {HERO_STAGES.map((s, i) => (
+                  <div
+                    key={s}
+                    className={`rounded-sm border px-2 py-2 text-center ${
+                      i === HERO_STAGES.length - 1
+                        ? "border-ok/50 bg-ok/10"
+                        : "border-ink-line bg-ink-raised"
+                    }`}
+                  >
+                    <span
+                      className={`font-mono text-[11px] uppercase tracking-wide ${
+                        i === HERO_STAGES.length - 1 ? "text-ok" : "text-dim"
+                      }`}
+                    >
+                      {s}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </Section>
