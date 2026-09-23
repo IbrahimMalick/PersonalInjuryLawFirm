@@ -1,20 +1,26 @@
 @import "tailwindcss";
 
 /* ── Night Docket tokens ────────────────────────────────────────────────────
-   ink    #151C28  midnight blue-black — the 2:47 AM ground
+   ink    #0D1119  near-black midnight — the 2:47 AM ground
    carbon #2E3A5C  carbon-copy blue — panels, inbound bubbles
-   manila #E8D5A3  folder stock — case cards, tabs
+   manila #E0A83E  brass gold — case cards, tabs
    paper  #F6F2E7  report paper — letterhead, detail sheets
    stamp  #BF3B2B  rubber-stamp red — conflicts, declines, SOL urgency
    meter  #FFB020  timestamp amber — owned by the clock and timers only
+
+   ink and ink-raised sit further apart than a typical dark theme on purpose —
+   cards need to visibly lift off the page, not just imply a border. manila
+   and ok were both re-tuned for richer saturation; contrast against
+   ink-raised and colorblind-safe separation were checked before landing on
+   these.
 */
 :root {
-  --ink: #151c28;
-  --ink-raised: #1d2636;
-  --ink-line: #32405c;
+  --ink: #0d1119;
+  --ink-raised: #2b3853;
+  --ink-line: #3d4d6e;
   --carbon: #2e3a5c;
-  --manila: #e8d5a3;
-  --manila-deep: #d9bf7f;
+  --manila: #e0a83e;
+  --manila-deep: #c6902e;
   --paper: #f6f2e7;
   --paper-dim: #eae4d3;
   --stamp: #bf3b2b;
@@ -23,7 +29,7 @@
   --text-dim: #9aa5bd;
   --text-on-paper: #241f16;
   --text-on-paper-dim: #6b6353;
-  --ok: #7fae7a;
+  --ok: #54a25d;
 }
 
 @theme inline {
