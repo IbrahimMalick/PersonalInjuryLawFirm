@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 
 // Public marketing page — what a logged-out visitor sees at the root.
 // Same Night Docket identity as the product; the pitch is the product.
@@ -272,15 +271,19 @@ export default function Landing() {
             </div>
 
             <div>
-              <div className="field-label text-manila mb-3">Real case file, not a mockup</div>
+              <div className="field-label text-manila mb-3">Real product, not a mockup</div>
               <div className="rounded-sm border border-ink-line bg-ink-raised p-2 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.6)]">
-                <Image
-                  src="/screenshot.png"
-                  alt="Nightshift's Live Desk showing an inbound voicemail turned into a structured case file, with the filing deadline computed and a reply queued for review"
-                  width={1440}
-                  height={900}
+                <video
+                  src="/demo-hero.mp4"
+                  poster="/screenshot.png"
+                  width={1280}
+                  height={800}
                   className="w-full h-auto rounded-[2px]"
-                  priority
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  aria-label="Screen recording of Nightshift's Live Desk: an inbound voicemail and two more leads each turning into a structured case file, computed deadline, and queued reply, in real time"
                 />
               </div>
               <div className="grid grid-cols-4 gap-2 mt-3">
