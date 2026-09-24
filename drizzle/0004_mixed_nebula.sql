@@ -1,0 +1,1 @@
+ALTER TABLE "firms" ADD COLUMN "practice_area" text DEFAULT 'personal_injury' NOT NULL;

@@ -3,14 +3,21 @@ import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 import AppShell from "@/components/product/AppShell";
+import ImmigrationCaseView, { TimeCriticalBanner } from "@/components/product/ImmigrationCaseView";
 import ReviewPanel from "@/components/product/ReviewPanel";
 import { audit } from "@/lib/audit";
 import { requireFirmUser } from "@/lib/auth";
+import {
+  caseTypeLabelOf,
+  contactOf,
+  isImmigrationCaseFile,
+  practiceAreaOf,
+  type AnyCaseFile,
+} from "@/lib/casefile";
 import { getDb, tables } from "@/lib/db";
 import { fmtDateTime } from "@/lib/format";
 import { disclaimerFor } from "@/lib/guardrails";
 import {
-  CASE_TYPE_LABEL,
   CHANNEL_LABEL,
   LANGUAGE_LABEL,
   OUTCOME_LABEL,
@@ -22,7 +29,6 @@ import {
 } from "@/lib/labels";
 import { isDemo } from "@/lib/mode";
 import { resolveReplyDestination } from "@/lib/reply";
-import type { CaseFile } from "@/lib/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -92,11 +98,14 @@ export default async function LeadReview({ params }: { params: Promise<{ id: str
     .where(eq(tables.auditEvents.leadId, id))
     .orderBy(asc(tables.auditEvents.id));
 
-  const cf = (lead.caseFile as unknown as CaseFile | null) ?? null;
-  const sol = cf?.statuteOfLimitations;
+  const cf = (lead.caseFile as unknown as AnyCaseFile | null) ?? null;
+  // Two case-file shapes (personal injury, immigration) — narrow once, here.
+  const pi = cf && !isImmigrationCaseFile(cf) ? cf : null;
+  const imm = cf && isImmigrationCaseFile(cf) ? cf : null;
+  const sol = pi?.statuteOfLimitations;
   const solUrgent = sol?.daysRemaining != null && sol.daysRemaining < 180;
   const conflict = (cf?.conflictFlags.length ?? 0) > 0;
-  const lang = cf?.claimant.preferredLanguage ?? "en";
+  const lang = (cf ? contactOf(cf).preferredLanguage : null) ?? "en";
   const destination = cf ? resolveReplyDestination(lead, cf) : null;
   const solAcknowledged = Boolean(firm.solAcknowledgedAt);
   const metaRecord = (lead.meta as Record<string, unknown>) ?? {};
@@ -172,11 +181,14 @@ export default async function LeadReview({ params }: { params: Promise<{ id: str
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h1 className="font-display font-bold text-3xl uppercase tracking-wide leading-none">
-                      {cf.claimant.name ?? "Name unknown"}
+                      {contactOf(cf).name ?? "Name unknown"}
                     </h1>
                     <div className="font-mono text-sm mt-1.5 text-paperdim">
-                      {CASE_TYPE_LABEL[cf.caseType]}
-                      {cf.incidentLocation ? ` · ${cf.incidentLocation}` : ""}
+                      {caseTypeLabelOf(cf)}
+                      {pi?.incidentLocation ? ` · ${pi.incidentLocation}` : ""}
+                      {imm?.applicant.countryOfCitizenship
+                        ? ` · ${imm.applicant.countryOfCitizenship}`
+                        : ""}
                     </div>
                   </div>
                   <span
@@ -199,6 +211,8 @@ export default async function LeadReview({ params }: { params: Promise<{ id: str
               </div>
             )}
 
+            {imm && <TimeCriticalBanner cf={imm} />}
+
             {conflict && cf && (
               <div className="rounded-sm border-2 border-stamp bg-stamp/10 px-5 py-3">
                 <div className="field-label text-stamp pb-1">Conflict check — match</div>
@@ -214,7 +228,9 @@ export default async function LeadReview({ params }: { params: Promise<{ id: str
               </div>
             )}
 
-            {cf && (
+            {imm && <ImmigrationCaseView cf={imm} deadlinesVisible={solAcknowledged} />}
+
+            {pi && (
               <div className="grid grid-cols-2 gap-3">
                 <div
                   className={`rounded-sm border px-5 py-4 ${
@@ -255,33 +271,33 @@ export default async function LeadReview({ params }: { params: Promise<{ id: str
                 <div className="rounded-sm border border-ink-line bg-ink-raised px-5 py-4">
                   <div className="field-label text-dim">Treatment status</div>
                   <div className="font-display font-bold uppercase tracking-wide text-3xl mt-2 text-inktext">
-                    {TREATMENT_LABEL[cf.treatmentStatus]}
+                    {TREATMENT_LABEL[pi.treatmentStatus]}
                   </div>
                   <div className="mt-3 space-y-1 font-mono text-sm">
                     <div>
                       <span className="text-dim">Incident date · </span>
-                      {cf.incidentDate ?? "not confirmed"}
+                      {pi.incidentDate ?? "not confirmed"}
                     </div>
                     <div>
                       <span className="text-dim">Liability · </span>
-                      <span className="capitalize">{cf.liabilityClarity}</span>
+                      <span className="capitalize">{pi.liabilityClarity}</span>
                     </div>
                     <div>
                       <span className="text-dim">Already has a lawyer · </span>
-                      {cf.priorRepresentation === "unknown"
+                      {pi.priorRepresentation === "unknown"
                         ? "unknown"
-                        : cf.priorRepresentation
+                        : pi.priorRepresentation
                           ? "yes"
                           : "no"}
                     </div>
                     <div>
                       <span className="text-dim">Other party · </span>
-                      {cf.otherPartyInfo.name ?? "unknown"}
-                      {cf.otherPartyInfo.insurer ? ` · ${cf.otherPartyInfo.insurer}` : ""}
+                      {pi.otherPartyInfo.name ?? "unknown"}
+                      {pi.otherPartyInfo.insurer ? ` · ${pi.otherPartyInfo.insurer}` : ""}
                     </div>
                     <div>
                       <span className="text-dim">Confidence · </span>
-                      {((cf.confidence ?? 0) * 100).toFixed(0)}%
+                      {((pi.confidence ?? 0) * 100).toFixed(0)}%
                     </div>
                   </div>
                 </div>
@@ -383,7 +399,7 @@ export default async function LeadReview({ params }: { params: Promise<{ id: str
               <ReviewPanel
                 leadId={lead.id}
                 initialDraft={message ? message.body.split("\n\n").slice(0, -1).join("\n\n") : (lead.draftReply ?? "")}
-                disclaimer={disclaimerFor(lang, firm.name)}
+                disclaimer={disclaimerFor(lang, firm.name, practiceAreaOf(cf))}
                 firm={{
                   name: firm.name,
                   practiceLine: firm.practiceLine,
@@ -405,7 +421,7 @@ export default async function LeadReview({ params }: { params: Promise<{ id: str
               <ReviewPanel
                 leadId={lead.id}
                 initialDraft=""
-                disclaimer={disclaimerFor("en", firm.name)}
+                disclaimer={disclaimerFor("en", firm.name, firm.practiceArea)}
                 firm={{
                   name: firm.name,
                   practiceLine: firm.practiceLine,

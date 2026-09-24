@@ -11,7 +11,7 @@ export default async function GuardrailsPage() {
   const { user, firm } = await requireFirmUser();
   return (
     <AppShell user={user} firm={firm}>
-      <GuardrailsPanel firmName={firm.name} />
+      <GuardrailsPanel firmName={firm.name} practiceArea={firm.practiceArea} variant="product" />
     </AppShell>
   );
 }

@@ -24,9 +24,12 @@ export function leadUrgency(params: {
   needsEyes: boolean;
   receivedAt: string;
   routing: string | null;
+  /** Immigration: a detained person or imminent hearing is red at once — no clock. */
+  timeCritical?: boolean;
   now?: Date;
 }): Urgency {
   if (!params.needsEyes) return "none";
+  if (params.timeCritical) return "red";
   const waitedMin =
     ((params.now ?? new Date()).getTime() - toDate(params.receivedAt).getTime()) / 60_000;
   const isSignNow = params.routing === "sign_now";

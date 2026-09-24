@@ -1,4 +1,6 @@
 import Link from "next/link";
+import Image from "next/image";
+import type { PracticeArea } from "@/lib/schema";
 
 // Public marketing page — what a logged-out visitor sees at the root.
 // Same Night Docket identity as the product; the pitch is the product.
@@ -130,6 +132,130 @@ const FAQS = [
   },
 ];
 
+// ── Immigration copy ─────────────────────────────────────────────────────────
+// Everything below is a claim about what the product actually does for an
+// immigration firm — no invented stats, no testimonials.
+
+const IMMIGRATION_CHECKLIST = [
+  "Reads voicemail, text, WhatsApp, email, and your web form — including Spanish",
+  "Builds a structured case file: status as stated, notices, hearing dates",
+  "Flags a detained person or an imminent hearing for immediate attention",
+  "Drafts the reply — a human approves every send",
+];
+
+const IMMIGRATION_GUARANTEES = [
+  { mark: "☑", text: "Nothing sends without a human clicking approve" },
+  { mark: "⏱", text: "Deadlines computed from a reviewed table — never guessed by AI" },
+  { mark: "⛔", text: "No legal advice, no eligibility or timing predictions, by construction" },
+  { mark: "▤", text: "Every action lands in an append-only audit trail" },
+];
+
+const IMMIGRATION_CARDS = [
+  {
+    n: "01",
+    title: "Reads the mess",
+    body: "A rambling voicemail, a WhatsApp in Spanish, a half-empty form — each becomes a structured case file: status as the sender describes it, any notice or hearing date they mention, who is sponsoring, and the exact questions intake still needs to ask.",
+  },
+  {
+    n: "02",
+    title: "Knows what it must never do",
+    body: "No legal advice. No predictions about eligibility, approval odds, or processing times. No advice on whether to file, travel, or attend a hearing. Deadlines come from a reviewed table and date math — never from the AI — and stay hidden until an attorney at your firm signs off on the table.",
+  },
+  {
+    n: "03",
+    title: "Your finger on Send",
+    body: "Every reply waits on your review screen, editable, with edits logged. A detained person or an imminent hearing is flagged time-critical by code, alerts your team at once, and gets a brief acknowledgment draft — still sent only when a person approves it.",
+  },
+];
+
+const IMMIGRATION_FAQS = [
+  {
+    q: "Does Nightshift give legal advice?",
+    a: "No — by construction, not by promise. The system prompt forbids legal advice, predictions about eligibility, approval odds or processing times, advice on whether to file, travel, or attend a hearing, and any statement of someone's immigration status as a legal conclusion. Every reply carries a disclaimer appended by application code, in the sender's language.",
+  },
+  {
+    q: "Who decides the filing deadline?",
+    a: "Your attorney does. Deadlines — a response window after a notice, an appeal window, a hearing date — are computed from a reviewed table plus date arithmetic, never from the AI, and stay hidden from reviewers until an attorney at your firm reviews that table and acknowledges it in Settings.",
+  },
+  {
+    q: "What happens when someone is detained or a hearing is close?",
+    a: "Code — not the model — flags it time-critical. It is never routed to decline or follow-up, your team is emailed immediately (and reminded 30 minutes later if no one has replied), and the draft is a brief acknowledgment. A person still approves the send.",
+  },
+  {
+    q: "Will this replace our intake staff?",
+    a: "No. Nightshift reads, sorts, scores, and drafts. A person at your firm reviews and approves every outbound reply before it sends — edits included and logged.",
+  },
+  {
+    q: "What happens if it can't figure out a message?",
+    a: "It's flagged \"needs attention\" with the raw message attached, so a person looks at it. Real leads never get a canned answer to paper over a failure.",
+  },
+  {
+    q: "What if a lead matches an existing client or an adverse party?",
+    a: "It's checked against your firm's conflict list automatically — the applicant, a sponsor, or a named employer or relative. A match holds the reply and requires an admin to release it.",
+  },
+  {
+    q: "What channels and languages does it cover?",
+    a: "Voicemail, SMS, WhatsApp, email, and your web intake form. The public form and the reply disclaimer are in English and Spanish, and replies are drafted in the sender's language.",
+  },
+];
+
+interface HeroMedia {
+  src: string;
+  alt: string;
+  label: string;
+  caption: string;
+}
+
+interface AreaCopy {
+  media: HeroMedia;
+  /** The pipeline's "Structure" step names what each area's case file holds. */
+  structureStep: string;
+  headline: [string, string];
+  lede: string;
+  checklist: string[];
+  guarantees: { mark: string; text: string }[];
+  cards: { n: string; title: string; body: string }[];
+  faqs: { q: string; a: string }[];
+}
+
+const AREA_COPY: Record<PracticeArea, AreaCopy> = {
+  personal_injury: {
+    media: {
+      src: "/screenshot.png",
+      alt: "Nightshift's Live Desk showing an inbound voicemail turned into a structured case file, with the filing deadline computed and a reply queued for review",
+      label: "Real case file, not a mockup",
+      caption: "A voicemail at 2:47 AM, read into a case file with the deadline computed and a reply waiting for a person to approve.",
+    },
+    structureStep: "The raw message becomes a case file: injuries, treatment status, liability, priority score.",
+    headline: ["Somebody just called your firm", "about a car accident."],
+    lede: "Nobody answers a law office at 3:12 AM — so that case signs with whoever answers first.",
+    checklist: HERO_CHECKLIST,
+    guarantees: GUARANTEES,
+    cards: CARDS,
+    faqs: FAQS,
+  },
+  immigration: {
+    media: {
+      src: "/screenshot-immigration.png",
+      alt: "Nightshift's immigration case screen for a sample lead with a hearing days away: a red time-critical banner, the computed hearing deadline, what the sender told us, and a brief acknowledgment reply waiting for a person to approve",
+      label: "Sample immigration case file",
+      caption: "The real screen, filled with fictional sample data: a hearing days away is flagged time-critical by code, and the reply waits for a person to approve.",
+    },
+    structureStep: "The raw message becomes a case file: status as stated, notices, hearing dates, priority score.",
+    headline: ["A frightened family just called your firm", "about a hearing next week."],
+    lede: "Nobody answers a law office at 3:12 AM — and immigration matters can't always wait until morning. Nightshift reads every after-hours message, flags what's time-critical, and drafts the reply.",
+    checklist: IMMIGRATION_CHECKLIST,
+    guarantees: IMMIGRATION_GUARANTEES,
+    cards: IMMIGRATION_CARDS,
+    faqs: IMMIGRATION_FAQS,
+  },
+};
+
+const AREA_TABS: { area: PracticeArea; label: string; href: string }[] = [
+  { area: "personal_injury", label: "Personal injury", href: "/" },
+  { area: "immigration", label: "Immigration", href: "/?area=immigration" },
+];
+
 function Section({
   id,
   className = "",
@@ -177,7 +303,8 @@ function Foot() {
   );
 }
 
-export default function Landing() {
+export default function Landing({ area = "personal_injury" }: { area?: PracticeArea }) {
+  const copy = AREA_COPY[area];
   return (
     <div className="min-h-screen flex flex-col">
       <header className="flex items-center justify-between px-6 py-4 gap-4">
@@ -215,20 +342,36 @@ export default function Landing() {
         <Section className="pt-12 pb-10">
           <div className="grid lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] gap-10 items-center">
             <div>
+              <div className="flex flex-wrap items-center gap-2 pb-5" role="group" aria-label="Practice area">
+                <span className="field-label text-dim mr-1">Built for</span>
+                {AREA_TABS.map((t) => (
+                  <Link
+                    key={t.area}
+                    href={t.href}
+                    aria-current={t.area === area ? "page" : undefined}
+                    className={`rounded-sm border px-3 py-1 font-display text-sm font-bold uppercase tracking-wider ${
+                      t.area === area
+                        ? "border-manila bg-manila text-papertext"
+                        : "border-ink-line text-dim hover:border-manila hover:text-manila"
+                    }`}
+                  >
+                    {t.label}
+                  </Link>
+                ))}
+              </div>
               <div className="font-mono text-meter text-xl tabular-nums pb-3">3:12 AM</div>
               <h1 className="font-display font-bold uppercase tracking-wide text-4xl sm:text-5xl leading-[1.05]">
-                <span className="text-paper">Somebody just called your firm</span>
+                <span className="text-paper">{copy.headline[0]}</span>
                 <br />
-                <span className="text-manila">about a car accident.</span>
+                <span className="text-manila">{copy.headline[1]}</span>
               </h1>
               <p className="text-dim text-lg mt-5 max-w-xl leading-relaxed">
-                Nobody answers a law office at 3:12 AM — so that case signs with whoever answers
-                first.{" "}
+                {copy.lede}{" "}
                 <span className="text-inktext">A person at your firm approves everything.</span>
               </p>
 
               <ul className="mt-6 space-y-2.5 max-w-md">
-                {HERO_CHECKLIST.map((item) => (
+                {copy.checklist.map((item) => (
                   <li key={item} className="flex gap-2.5 items-start text-[15px]">
                     <span className="text-ok font-mono leading-[1.4]" aria-hidden>
                       ☑
@@ -271,21 +414,18 @@ export default function Landing() {
             </div>
 
             <div>
-              <div className="field-label text-manila mb-3">Real product, not a mockup</div>
+              <div className="field-label text-manila mb-3">{copy.media.label}</div>
               <div className="rounded-sm border border-ink-line bg-ink-raised p-2 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.6)]">
-                <video
-                  src="/demo-hero.mp4"
-                  poster="/screenshot.png"
-                  width={1280}
-                  height={800}
+                <Image
+                  src={copy.media.src}
+                  alt={copy.media.alt}
+                  width={1440}
+                  height={900}
                   className="w-full h-auto rounded-[2px]"
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  aria-label="Screen recording of Nightshift's Live Desk: an inbound voicemail and two more leads each turning into a structured case file, computed deadline, and queued reply, in real time"
+                  priority
                 />
               </div>
+              <p className="text-dim text-[13px] mt-2">{copy.media.caption}</p>
               <div className="grid grid-cols-4 gap-2 mt-3">
                 {HERO_STAGES.map((s, i) => (
                   <div
@@ -313,7 +453,7 @@ export default function Landing() {
         {/* Guarantee strip */}
         <Section className="py-8">
           <div className="rounded-sm border border-ink-line bg-ink-raised px-5 py-5 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {GUARANTEES.map((g) => (
+            {copy.guarantees.map((g) => (
               <div key={g.text} className="flex gap-3 items-start">
                 <span className="text-meter font-mono text-lg leading-none pt-0.5">{g.mark}</span>
                 <span className="text-[14px] text-dim leading-snug">{g.text}</span>
@@ -348,7 +488,7 @@ export default function Landing() {
             The trust boundary is the product.
           </h2>
           <div className="grid md:grid-cols-3 gap-4">
-            {CARDS.map((c) => (
+            {copy.cards.map((c) => (
               <div key={c.n} className="rounded-sm border border-ink-line bg-ink-raised px-5 py-5">
                 <span className="font-mono text-manila text-sm">{c.n}</span>
                 <h3 className="font-display font-bold uppercase tracking-wide text-xl text-paper mt-2 mb-2">
@@ -369,7 +509,7 @@ export default function Landing() {
                     <div className="font-display font-bold uppercase tracking-wide text-[15px] text-paper mt-1">
                       {p.title}
                     </div>
-                    <p className="text-[13px] text-dim leading-snug mt-1">{p.body}</p>
+                    <p className="text-[13px] text-dim leading-snug mt-1">{p.n === "02" ? copy.structureStep : p.body}</p>
                   </div>
                   {i < PIPELINE.length - 1 && (
                     <span
@@ -432,7 +572,7 @@ export default function Landing() {
             Questions firms ask us first
           </h2>
           <div className="grid md:grid-cols-2 gap-x-8 gap-y-6">
-            {FAQS.map((f) => (
+            {copy.faqs.map((f) => (
               <div key={f.q} className="border-t border-ink-line pt-4">
                 <h3 className="font-display font-bold text-[17px] text-paper mb-1.5">{f.q}</h3>
                 <p className="text-[15px] text-dim leading-relaxed">{f.a}</p>

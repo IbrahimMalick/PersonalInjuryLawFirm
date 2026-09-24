@@ -80,12 +80,45 @@ export async function POST(request: Request) {
 
   const { urls: attachments } = await uploadAttachments(attachmentFiles, `intake/${firm.slug}`);
 
+  // Immigration firms' form has three extra optional fields. They are appended
+  // to the text the model reads AND kept as formFields — the "someone is
+  // detained" answer is also handed to code as a backstop (lib/pipeline.ts).
+  const extraLines: string[] = [];
+  const extraFields: Record<string, string> = {};
+  if (firm.practiceArea === "immigration") {
+    const country = (fields.country ?? "").trim().slice(0, 100);
+    const detainedRaw = (fields.detained ?? "").trim().toLowerCase();
+    const keyDateRaw = (fields.keyDate ?? "").trim();
+    const detained =
+      detainedRaw === "yes"
+        ? "Yes"
+        : detainedRaw === "no"
+          ? "No"
+          : detainedRaw === "unsure"
+            ? "Not sure"
+            : "";
+    const keyDate = /^\d{4}-\d{2}-\d{2}$/.test(keyDateRaw) ? keyDateRaw : "";
+    if (country) {
+      extraLines.push(`Country of citizenship: ${country}`);
+      extraFields["Country of citizenship"] = country;
+    }
+    if (detained) {
+      extraLines.push(`Currently detained: ${detained}`);
+      extraFields["Currently detained"] = detained;
+    }
+    if (keyDate) {
+      extraLines.push(`Upcoming hearing or notice deadline (as given by sender): ${keyDate}`);
+      extraFields["Upcoming hearing or notice deadline"] = keyDate;
+    }
+  }
+
   const raw = [
     `First name: ${firstName || "(blank)"}`,
     `Last name: ${lastName || "(blank)"}`,
     `Phone: ${phone || "(blank)"}`,
     `Email: ${email || "(blank)"}`,
     `How can we help?: ${message || "(blank)"}`,
+    ...extraLines,
   ].join("\n");
 
   await ingestLead({
@@ -101,6 +134,7 @@ export async function POST(request: Request) {
         Phone: phone,
         Email: email,
         "How can we help?": message,
+        ...extraFields,
       },
       ip,
       ...(attachments.length > 0 ? { attachments } : {}),

@@ -8,6 +8,7 @@ import { hashPassword, requireFirmUser } from "@/lib/auth";
 import { channelStatus } from "@/lib/channels/outbound";
 import { getDb, tables } from "@/lib/db";
 import { updateFirm } from "@/lib/firm";
+import { PRACTICE_AREA_LABEL } from "@/lib/labels";
 import { isDemo } from "@/lib/mode";
 
 export const dynamic = "force-dynamic";
@@ -104,6 +105,16 @@ export default async function SettingsPage({
                   <span className="field-label text-dim">Firm name</span>
                   <input name="name" defaultValue={firm.name} className={input} />
                 </label>
+                <div className="block">
+                  <span className="field-label text-dim">Practice area</span>
+                  <p className="text-[15px] text-inktext mt-1">
+                    {PRACTICE_AREA_LABEL[firm.practiceArea]}
+                    <span className="text-dim text-sm">
+                      {" "}
+                      — set at signup. To change it, contact us.
+                    </span>
+                  </p>
+                </div>
                 <label className="block">
                   <span className="field-label text-dim">Practice line</span>
                   <input name="practiceLine" defaultValue={firm.practiceLine} className={input} />
@@ -132,8 +143,10 @@ export default async function SettingsPage({
             <div className={card}>
               <h2 className={h2}>Deadline table</h2>
               <p className="text-sm text-dim leading-snug">
-                Filing-deadline countdowns come from a reviewed table plus date math — never
-                from the model. The table ships as illustrative data:{" "}
+                {firm.practiceArea === "immigration"
+                  ? "Deadline countdowns (hearing dates, notice-response and appeal windows, filing bars) come from a reviewed table plus date math — never from the model. "
+                  : "Filing-deadline countdowns come from a reviewed table plus date math — never from the model. "}
+                The table ships as illustrative data:{" "}
                 <span className="text-inktext">
                   an attorney at your firm must review it against current law and acknowledge
                   it before deadlines are shown to reviewers.

@@ -22,6 +22,13 @@ export const firms = pgTable(
     id: serial("id").primaryKey(),
     slug: text("slug").notNull(),
     name: text("name").notNull(),
+    // Set at signup; changing it later is operator-only. Existing firms are
+    // personal injury. Drives the case-file shape, prompt, guardrails and
+    // deadline table (lib/practice-areas.ts). practiceLine below stays the
+    // free-text display label.
+    practiceArea: text("practice_area", { enum: ["personal_injury", "immigration"] })
+      .notNull()
+      .default("personal_injury"),
     practiceLine: text("practice_line").notNull().default("Injury Law"),
     addressLine: text("address_line").notNull().default(""),
     phone: text("phone").notNull().default(""),

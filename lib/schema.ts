@@ -31,6 +31,13 @@ export type TreatmentStatus = (typeof TREATMENT_STATUSES)[number];
 export const ROUTINGS = ["sign_now", "schedule_consult", "nurture", "decline"] as const;
 export type Routing = (typeof ROUTINGS)[number];
 
+// A firm's practice area, fixed at signup. Each area has its own case-file
+// shape (lib/immigration-schema.ts for immigration). Personal injury is the
+// original shape and carries no discriminant in stored rows — anything without
+// a `practiceArea` is personal injury.
+export const PRACTICE_AREAS = ["personal_injury", "immigration"] as const;
+export type PracticeArea = (typeof PRACTICE_AREAS)[number];
+
 const isoDate = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "incidentDate must be an ISO date (YYYY-MM-DD)")
@@ -76,6 +83,9 @@ export interface StatuteOfLimitations {
 }
 
 export interface CaseFile {
+  // Absent on every case file stored before practice areas existed; treated as
+  // personal injury everywhere. Only immigration case files set it to a value.
+  practiceArea?: "personal_injury";
   caseType: CaseType;
   incidentDate: string | null;
   incidentLocation: string | null;

@@ -10,8 +10,8 @@ import Landing from "@/components/Landing";
 import { getDb, tables } from "@/lib/db";
 import { isDemo } from "@/lib/mode";
 import { fmtDateTime, agoLabel } from "@/lib/format";
-import { CASE_TYPE_LABEL, ROUTING_LABEL } from "@/lib/labels";
-import type { CaseFile } from "@/lib/schema";
+import { caseTypeLabelOf, contactOf, isTimeCritical, type AnyCaseFile } from "@/lib/casefile";
+import { ROUTING_LABEL } from "@/lib/labels";
 import { leadUrgency, type Urgency } from "@/lib/urgency";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +36,7 @@ function StatusChip({
   replied,
 }: {
   status: string;
-  caseFile: CaseFile | null;
+  caseFile: AnyCaseFile | null;
   replied: boolean;
 }) {
   if (status === "needs_attention")
@@ -47,6 +47,12 @@ function StatusChip({
   if (caseFile?.conflictFlags?.length)
     return <span className="field-label text-stamp">CONFLICT — HELD</span>;
   if (replied) return <span className="field-label text-ok">Reply sent ✓</span>;
+  if (isTimeCritical(caseFile))
+    return (
+      <span className="field-label text-stamp font-semibold">
+        ⚠ TIME-CRITICAL · {ROUTING_LABEL[caseFile!.routing]}
+      </span>
+    );
   if (caseFile)
     return (
       <span
@@ -169,9 +175,17 @@ async function OnboardingCard({
   );
 }
 
-export default async function Inbox() {
+export default async function Inbox({
+  searchParams,
+}: {
+  searchParams: Promise<{ area?: string }>;
+}) {
   if (isDemo()) redirect("/demo");
-  if (!(await currentUser())) return <Landing />;
+  if (!(await currentUser())) {
+    // The public landing page speaks to one practice area at a time (?area=immigration).
+    const { area } = await searchParams;
+    return <Landing area={area === "immigration" ? "immigration" : "personal_injury"} />;
+  }
   const { user, firm } = await requireFirmUser();
   const db = await getDb();
 
@@ -198,15 +212,16 @@ export default async function Inbox() {
   const replied = new Set(repliedRows.map((r) => r.leadId));
 
   const leadsWithMeta = leads.map((lead) => {
-    const cf = (lead.caseFile as unknown as CaseFile | null) ?? null;
+    const cf = (lead.caseFile as unknown as AnyCaseFile | null) ?? null;
     const needsEyes =
       lead.status === "needs_attention" || (lead.status === "triaged" && !replied.has(lead.id));
     const urgency = leadUrgency({
       needsEyes,
       receivedAt: lead.receivedAt,
       routing: cf?.routing ?? null,
+      timeCritical: isTimeCritical(cf),
     });
-    return { lead, cf, needsEyes, urgency };
+    return { lead, cf, needsEyes, urgency, timeCritical: isTimeCritical(cf) };
   });
 
   const counts = {
@@ -215,7 +230,8 @@ export default async function Inbox() {
     ).length,
     attention: leads.filter((l) => l.status === "needs_attention").length,
     reading: leads.filter((l) => l.status === "received" || l.status === "processing").length,
-    overdue: leadsWithMeta.filter((l) => l.urgency === "red").length,
+    overdue: leadsWithMeta.filter((l) => l.urgency === "red" && !l.timeCritical).length,
+    timeCritical: leadsWithMeta.filter((l) => l.timeCritical && l.needsEyes).length,
   };
 
   return (
@@ -233,6 +249,9 @@ export default async function Inbox() {
         <div className="flex items-center justify-between pb-3">
           <div className="flex items-center gap-5 font-mono text-sm">
             <span className="text-manila">{counts.waiting} awaiting review</span>
+            {counts.timeCritical > 0 && (
+              <span className="text-stamp font-bold">⚠ {counts.timeCritical} time-critical</span>
+            )}
             {counts.overdue > 0 && (
               <span className="text-stamp font-semibold">⏱ {counts.overdue} overdue</span>
             )}
@@ -258,7 +277,7 @@ export default async function Inbox() {
           </div>
         ) : (
           <div className="space-y-2">
-            {leadsWithMeta.map(({ lead, cf, needsEyes, urgency }) => {
+            {leadsWithMeta.map(({ lead, cf, needsEyes, urgency, timeCritical }) => {
               return (
                 <Link
                   key={lead.id}
@@ -271,11 +290,16 @@ export default async function Inbox() {
                   <span className="min-w-0">
                     <span className="flex items-baseline gap-3">
                       <span className="font-display font-semibold text-lg text-paper uppercase tracking-wide truncate">
-                        {cf?.claimant.name ?? lead.displayName ?? lead.fromAddress}
+                        {(cf ? contactOf(cf).name : null) ?? lead.displayName ?? lead.fromAddress}
                       </span>
+                      {timeCritical && (
+                        <span className="shrink-0 rounded-sm bg-stamp px-2 py-0.5 font-display text-sm font-bold uppercase tracking-wider text-paper">
+                          ⚠ Time-critical
+                        </span>
+                      )}
                       {cf && (
                         <span className="font-mono text-sm text-dim shrink-0">
-                          {CASE_TYPE_LABEL[cf.caseType]}
+                          {caseTypeLabelOf(cf)}
                           {" · "}priority {cf.priorityScore}
                         </span>
                       )}

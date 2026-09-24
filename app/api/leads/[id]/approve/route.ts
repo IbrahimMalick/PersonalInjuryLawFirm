@@ -8,7 +8,7 @@ import { getFirmById } from "@/lib/firm";
 import { disclaimerFor } from "@/lib/guardrails";
 import { enqueue } from "@/lib/queue";
 import { resolveReplyDestination } from "@/lib/reply";
-import type { CaseFile } from "@/lib/schema";
+import { contactOf, practiceAreaOf, type AnyCaseFile } from "@/lib/casefile";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +36,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   if (lead.status !== "triaged" || !lead.caseFile) {
     return NextResponse.json({ error: "Lead is not ready for review" }, { status: 409 });
   }
-  const cf = lead.caseFile as unknown as CaseFile;
+  const cf = lead.caseFile as unknown as AnyCaseFile;
 
   if (cf.conflictFlags.length > 0 && user.role !== "admin") {
     return NextResponse.json(
@@ -71,7 +71,9 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     );
   }
   const finalBody =
-    body.trim() + "\n\n" + disclaimerFor(cf.claimant.preferredLanguage, firm.name);
+    body.trim() +
+    "\n\n" +
+    disclaimerFor(contactOf(cf).preferredLanguage, firm.name, practiceAreaOf(cf));
 
   const edited = body.trim() !== (lead.draftReply ?? "").trim();
   if (edited) {

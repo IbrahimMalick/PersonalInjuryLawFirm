@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import IntakeSubmitButton from "@/components/IntakeSubmitButton";
 import { blobConfigured } from "@/lib/blob";
 import { getFirmBySlug } from "@/lib/firm";
-import { INTAKE_COPY, intakeLang } from "@/lib/intake-copy";
+import { intakeCopyFor, intakeLang } from "@/lib/intake-copy";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +26,8 @@ export default async function IntakeForm({
   if (!firm) notFound();
   const { sent, lang: langParam } = await searchParams;
   const lang = intakeLang(langParam);
-  const t = INTAKE_COPY[lang];
+  const t = intakeCopyFor(firm.practiceArea, lang);
+  const imm = t.immigration;
 
   const input =
     "w-full rounded-sm border border-papertext/25 bg-white px-3 py-2.5 text-[16px] text-papertext focus:outline focus:outline-2 focus:outline-carbon";
@@ -106,6 +107,37 @@ export default async function IntakeForm({
               <span className="field-label text-paperdim">{t.whatHappened}</span>
               <textarea name="message" rows={6} className={input} />
             </label>
+            {imm && (
+              <>
+                <p className="text-[13px] leading-snug text-paperdim">{imm.identifierWarning}</p>
+                <label className="block">
+                  <span className="field-label text-paperdim">{imm.countryLabel}</span>
+                  <input name="country" className={input} autoComplete="country-name" />
+                </label>
+                <fieldset className="block">
+                  <legend className="field-label text-paperdim">{imm.detainedLabel}</legend>
+                  <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-[16px]">
+                    {(
+                      [
+                        ["yes", imm.detainedYes],
+                        ["no", imm.detainedNo],
+                        ["unsure", imm.detainedUnsure],
+                      ] as const
+                    ).map(([value, label]) => (
+                      <label key={value} className="flex items-center gap-2">
+                        <input type="radio" name="detained" value={value} />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                <label className="block">
+                  <span className="field-label text-paperdim">{imm.keyDateLabel}</span>
+                  <input name="keyDate" type="date" className={input} />
+                  <span className="block text-[13px] text-paperdim mt-1">{imm.keyDateHint}</span>
+                </label>
+              </>
+            )}
             {blobConfigured() && (
               <label className="block">
                 <span className="field-label text-paperdim">{t.attachmentsLabel}</span>
