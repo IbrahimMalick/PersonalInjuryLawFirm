@@ -6,8 +6,7 @@ import { requireFirmUser } from "@/lib/auth";
 import { getDb, tables } from "@/lib/db";
 import { fmtDateTime } from "@/lib/format";
 import { isDemo } from "@/lib/mode";
-import type { CaseFile } from "@/lib/schema";
-import { CASE_TYPE_LABEL } from "@/lib/labels";
+import { caseTypeLabelOf, contactOf, type AnyCaseFile } from "@/lib/casefile";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +37,7 @@ export default async function ArchivePage() {
         ) : (
           <div className="space-y-2">
             {leads.map((lead) => {
-              const cf = (lead.caseFile as unknown as CaseFile | null) ?? null;
+              const cf = (lead.caseFile as unknown as AnyCaseFile | null) ?? null;
               return (
                 <Link
                   key={lead.id}
@@ -47,11 +46,11 @@ export default async function ArchivePage() {
                 >
                   <span className="truncate">
                     <span className="text-inktext">
-                      {cf?.claimant.name ?? lead.displayName ?? lead.fromAddress}
+                      {(cf ? contactOf(cf).name : null) ?? lead.displayName ?? lead.fromAddress}
                     </span>
                     {cf && (
                       <span className="font-mono text-sm text-dim ml-3">
-                        {CASE_TYPE_LABEL[cf.caseType]}
+                        {caseTypeLabelOf(cf)}
                       </span>
                     )}
                   </span>

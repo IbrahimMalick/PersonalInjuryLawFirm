@@ -9,6 +9,8 @@ import { billingEnabled, TRIAL_DAYS } from "@/lib/billing";
 import { updateFirm } from "@/lib/firm";
 import { getDb, tables } from "@/lib/db";
 import { createFirm } from "@/lib/firm";
+import { PRACTICE_AREA_LABEL } from "@/lib/labels";
+import { PRACTICE_AREAS, type PracticeArea } from "@/lib/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -36,11 +38,15 @@ async function signup(formData: FormData): Promise<void> {
 
   const firmName = String(formData.get("firmName") ?? "").trim();
   const practiceLine = String(formData.get("practiceLine") ?? "").trim();
+  const practiceAreaRaw = String(formData.get("practiceArea") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
 
-  if (!firmName || !name || !email.includes("@") || password.length < 10) {
+  const practiceArea = (PRACTICE_AREAS as readonly string[]).includes(practiceAreaRaw)
+    ? (practiceAreaRaw as PracticeArea)
+    : null;
+  if (!firmName || !name || !practiceArea || !email.includes("@") || password.length < 10) {
     redirect("/signup?error=fields");
   }
 
@@ -52,7 +58,7 @@ async function signup(formData: FormData): Promise<void> {
     .limit(1);
   if (existing[0]) redirect("/signup?error=email");
 
-  const firm = await createFirm(firmName, practiceLine);
+  const firm = await createFirm(firmName, practiceLine, practiceArea);
   if (billingEnabled()) {
     await updateFirm(firm.id, {
       trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 86_400_000).toISOString(),
@@ -73,14 +79,14 @@ async function signup(formData: FormData): Promise<void> {
   await audit("firm.signed_up", {
     firmId: firm.id,
     userId: inserted[0].id,
-    detail: { firmName, slug: firm.slug, adminEmail: email },
+    detail: { firmName, slug: firm.slug, adminEmail: email, practiceArea },
   });
   await createSession(inserted[0].id);
   redirect("/?welcome=1");
 }
 
 const ERRORS: Record<string, string> = {
-  fields: "Check the fields: every field is required, and the password needs at least 10 characters.",
+  fields: "Check the fields: pick a practice area, fill in every required field, and use a password of at least 10 characters.",
   email: "That email already has an account — sign in instead.",
   rate: "Too many signups from this connection. Try again in an hour, or call us and we'll set you up.",
 };
@@ -123,8 +129,29 @@ export default async function SignupPage({
             <input name="firmName" required className={input} placeholder="Your firm's name" />
           </label>
           <label className="block">
-            <span className="field-label text-dim">Practice line</span>
-            <input name="practiceLine" className={input} placeholder="Injury Law" />
+            <span className="field-label text-dim">Practice area</span>
+            <select name="practiceArea" required defaultValue="" className={input}>
+              <option value="" disabled>
+                Choose your practice area…
+              </option>
+              {PRACTICE_AREAS.map((a) => (
+                <option key={a} value={a}>
+                  {PRACTICE_AREA_LABEL[a]}
+                </option>
+              ))}
+            </select>
+            <span className="block text-[13px] text-dim mt-1">
+              Chosen once, at signup — it sets how your intake desk reads and replies. To change
+              it later, contact us.
+            </span>
+          </label>
+          <label className="block">
+            <span className="field-label text-dim">Practice line (optional)</span>
+            <input
+              name="practiceLine"
+              className={input}
+              placeholder="Shown on letterhead — defaults from your practice area"
+            />
           </label>
           <div className="border-t border-ink-line pt-4 space-y-4">
             <label className="block">

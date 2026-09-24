@@ -16,7 +16,7 @@ import {
 } from "@/lib/insights";
 import { CHANNEL_LABEL, OUTCOME_LABEL, ROUTING_LABEL } from "@/lib/labels";
 import { isDemo } from "@/lib/mode";
-import type { CaseFile } from "@/lib/schema";
+import type { AnyCaseFile } from "@/lib/casefile";
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +70,7 @@ export default async function InsightsPage() {
     id: r.id,
     channel: r.channel,
     receivedAt: r.receivedAt,
-    routing: r.caseFile ? ((r.caseFile as unknown as CaseFile).routing ?? null) : null,
+    routing: r.caseFile ? ((r.caseFile as unknown as AnyCaseFile).routing ?? null) : null,
     outcome: r.outcome,
   }));
 

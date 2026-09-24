@@ -8,8 +8,13 @@
 //
 // Never throws: a GHL outage must not fail lead processing.
 
-import { CASE_TYPE_LABEL, ROUTING_LABEL, TREATMENT_LABEL } from "../labels";
-import type { CaseFile } from "../schema";
+import { caseTypeLabelOf, contactOf, isImmigrationCaseFile, type AnyCaseFile } from "../casefile";
+import {
+  CURRENT_STATUS_LABEL,
+  NOTICE_TYPE_LABEL,
+  ROUTING_LABEL,
+  TREATMENT_LABEL,
+} from "../labels";
 import { GHL_API, ghlApiConfigured, ghlHeaders } from "./ghl";
 
 export function ghlSyncEnabled(): boolean {
@@ -24,8 +29,15 @@ export interface LeadSyncInput {
   raw: string;
   firmName: string;
   /** The triaged case file, or null when automatic triage failed. */
-  caseFile: CaseFile | null;
+  caseFile: AnyCaseFile | null;
   processingError?: string | null;
+  /**
+   * Whether an attorney at the firm has acknowledged the deadline table. Until
+   * then the note carries no computed deadline (SOL or immigration) — the same
+   * gate the review screen applies. Callers pass it explicitly; omitted means
+   * visible.
+   */
+  deadlinesVisible?: boolean;
 }
 
 const looksLikeEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
@@ -37,12 +49,12 @@ function leadUrl(leadId: string): string {
 }
 
 function contactIdentity(input: LeadSyncInput): { email?: string; phone?: string; name?: string } {
-  const cf = input.caseFile;
+  const contact = input.caseFile ? contactOf(input.caseFile) : null;
   const email =
-    cf?.claimant.email ?? (looksLikeEmail(input.fromAddress) ? input.fromAddress.trim() : undefined);
+    contact?.email ?? (looksLikeEmail(input.fromAddress) ? input.fromAddress.trim() : undefined);
   const phone =
-    cf?.claimant.phone ?? (looksLikePhone(input.fromAddress) ? input.fromAddress.trim() : undefined);
-  const name = cf?.claimant.name ?? input.displayName ?? undefined;
+    contact?.phone ?? (looksLikePhone(input.fromAddress) ? input.fromAddress.trim() : undefined);
+  const name = contact?.name ?? input.displayName ?? undefined;
   return { email, phone, name };
 }
 
@@ -53,22 +65,61 @@ function tagsFor(input: LeadSyncInput): string[] {
     tags.push("Nightshift: Needs Attention");
     return tags;
   }
-  tags.push(`Nightshift Case: ${CASE_TYPE_LABEL[cf.caseType]}`);
+  tags.push(`Nightshift Case: ${caseTypeLabelOf(cf)}`);
   tags.push(`Nightshift Routing: ${ROUTING_LABEL[cf.routing]}`);
+  if (isImmigrationCaseFile(cf) && cf.timeCritical) tags.push("Nightshift: TIME-CRITICAL");
   if (cf.conflictFlags.length > 0) tags.push("Nightshift: CONFLICT");
   if (cf.needsHumanReview) tags.push("Nightshift: Needs Review");
   return tags;
 }
 
-function noteBody(input: LeadSyncInput): string {
+export function noteBody(input: LeadSyncInput): string {
   const cf = input.caseFile;
   const L: string[] = [`Nightshift intake — ${input.firmName}`, ""];
 
   if (!cf) {
     L.push(`Automatic triage did not complete: ${input.processingError ?? "unknown error"}`);
     L.push("", "As it arrived:", input.raw.slice(0, 2000));
+  } else if (isImmigrationCaseFile(cf)) {
+    L.push(`Case type:   ${caseTypeLabelOf(cf)}`);
+    L.push(`Priority:    ${cf.priorityScore}/100`);
+    L.push(`Rationale:   ${cf.scoreRationale}`);
+    L.push(`Routing:     ${ROUTING_LABEL[cf.routing]}`);
+    L.push(`Confidence:  ${Math.round(cf.confidence * 100)}%`);
+    if (cf.timeCritical) L.push(`TIME-CRITICAL: ${cf.timeCriticalReasons.join("; ")}`);
+    if (cf.needsHumanReview) L.push("Flagged for human review.");
+    if (cf.conflictFlags.length > 0) L.push(`CONFLICT HOLD: ${cf.conflictFlags.join("; ")}`);
+    L.push("");
+    L.push(
+      `Status:      ${CURRENT_STATUS_LABEL[cf.currentStatus]}` +
+        (cf.currentStatusDetail ? ` (${cf.currentStatusDetail})` : "")
+    );
+    if (cf.applicant.countryOfCitizenship) L.push(`Citizenship: ${cf.applicant.countryOfCitizenship}`);
+    if (cf.noticeReceived.type !== "none" && cf.noticeReceived.type !== "unknown") {
+      L.push(
+        `Notice:      ${NOTICE_TYPE_LABEL[cf.noticeReceived.type]}` +
+          (cf.noticeReceived.noticeDate ? ` (${cf.noticeReceived.noticeDate})` : "")
+      );
+    }
+    if (cf.pendingFiling.formType) L.push(`Filing:      ${cf.pendingFiling.formType}`);
+    if (cf.removal.isDetained === true) L.push("Detained:    yes (as reported)");
+    // Computed deadlines only once an attorney has acknowledged the table —
+    // the same gate as the review screen.
+    if (input.deadlinesVisible) {
+      for (const d of cf.deadlines) {
+        L.push(
+          d.kind === "computed"
+            ? `Deadline:    ${d.label} — ${d.deadlineISO} — ${d.daysRemaining} days left — ${d.basis}`
+            : `Deadline:    ${d.label} — ${d.basis}`
+        );
+      }
+    }
+    if (cf.missingInfo.length > 0) {
+      L.push("", "Intake still needs:");
+      cf.missingInfo.forEach((q) => L.push(`  - ${q}`));
+    }
   } else {
-    L.push(`Case type:   ${CASE_TYPE_LABEL[cf.caseType]}`);
+    L.push(`Case type:   ${caseTypeLabelOf(cf)}`);
     L.push(`Priority:    ${cf.priorityScore}/100`);
     L.push(`Rationale:   ${cf.scoreRationale}`);
     L.push(`Routing:     ${ROUTING_LABEL[cf.routing]}`);
@@ -90,7 +141,9 @@ function noteBody(input: LeadSyncInput): string {
       );
     }
     const sol = cf.statuteOfLimitations;
-    if (sol.deadlineISO) {
+    // Same gate as the review screen: no computed deadline leaves the app
+    // until an attorney at the firm has acknowledged the table.
+    if (sol.deadlineISO && input.deadlinesVisible !== false) {
       L.push(`SOL:         ${sol.deadlineISO} — ${sol.daysRemaining} days left — ${sol.basis}`);
     }
     if (cf.missingInfo.length > 0) {

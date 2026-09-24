@@ -7,7 +7,9 @@ import { isOperator, requireFirmUser } from "@/lib/auth";
 import { billingEnabled, firmBillingState } from "@/lib/billing";
 import { getDb, tables } from "@/lib/db";
 import type { FirmRow } from "@/lib/db/schema";
+import { DEFAULT_PRACTICE_LINE, PRACTICE_AREA_LABEL } from "@/lib/labels";
 import { isDemo } from "@/lib/mode";
+import { PRACTICE_AREAS, type PracticeArea } from "@/lib/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +59,42 @@ async function setTwilioNumber(formData: FormData): Promise<void> {
     firmId,
     userId: user.id,
     detail: { number },
+  });
+  revalidatePath("/operator");
+}
+
+// Practice area is fixed at signup; changing it is an operator decision. The
+// case files already stored keep their own shape; new leads use the new area.
+// The attorney acknowledgment is reset, because the table an attorney signed
+// off on belongs to the OLD area.
+async function setPracticeArea(formData: FormData): Promise<void> {
+  "use server";
+  const { user } = await requireFirmUser();
+  if (!isOperator(user)) redirect("/");
+  const firmId = Number(formData.get("firmId"));
+  const raw = String(formData.get("practiceArea") ?? "");
+  if (!(PRACTICE_AREAS as readonly string[]).includes(raw)) redirect("/operator");
+  const next = raw as PracticeArea;
+
+  const db = await getDb();
+  const firm = (
+    await db.select().from(tables.firms).where(eq(tables.firms.id, firmId)).limit(1)
+  )[0];
+  if (!firm || firm.practiceArea === next) redirect("/operator");
+
+  // Carry the display label over only if it was still the old area's default.
+  const practiceLine =
+    firm.practiceLine === DEFAULT_PRACTICE_LINE[firm.practiceArea]
+      ? DEFAULT_PRACTICE_LINE[next]
+      : firm.practiceLine;
+  await db
+    .update(tables.firms)
+    .set({ practiceArea: next, practiceLine, solAcknowledgedAt: null, solAcknowledgedBy: null })
+    .where(eq(tables.firms.id, firmId));
+  await audit("operator.practice_area_set", {
+    firmId,
+    userId: user.id,
+    detail: { from: firm.practiceArea, to: next, acknowledgmentReset: Boolean(firm.solAcknowledgedAt) },
   });
   revalidatePath("/operator");
 }
@@ -143,7 +181,7 @@ export default async function OperatorConsole() {
           {firms.map((f) => {
             const onboarding: string[] = [];
             if (!(partiesBy[f.id] > 0)) onboarding.push("conflict list");
-            if (!f.solAcknowledgedAt) onboarding.push("SOL ack");
+            if (!f.solAcknowledgedAt) onboarding.push("deadline-table ack");
             if (!f.twilioNumber) onboarding.push("phone");
             if (!(usersBy[f.id] > 1)) onboarding.push("team");
             const billing = billingLabel(f);
@@ -158,7 +196,8 @@ export default async function OperatorConsole() {
                       {f.name}
                     </div>
                     <div className="font-mono text-xs text-dim truncate">
-                      /{f.slug} · since {f.createdAt.slice(0, 10)} ·{" "}
+                      {PRACTICE_AREA_LABEL[f.practiceArea]} · /{f.slug} · since{" "}
+                      {f.createdAt.slice(0, 10)} ·{" "}
                       <a
                         className="text-manila hover:underline"
                         href={`${base}/intake/${f.slug}`}
@@ -201,6 +240,30 @@ export default async function OperatorConsole() {
                     ✉ {f.emailInboundToken.slice(0, 8)}…
                   </span>
                 </div>
+
+                <form
+                  action={setPracticeArea}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-ink-line px-4 py-2.5"
+                >
+                  <input type="hidden" name="firmId" value={f.id} />
+                  <span className="field-label text-dim">Practice area</span>
+                  <select
+                    name="practiceArea"
+                    defaultValue={f.practiceArea}
+                    className={input}
+                    aria-label={`Practice area for ${f.name}`}
+                  >
+                    {PRACTICE_AREAS.map((a) => (
+                      <option key={a} value={a}>
+                        {PRACTICE_AREA_LABEL[a]}
+                      </option>
+                    ))}
+                  </select>
+                  <button className="field-label text-manila hover:text-meter shrink-0">Set</button>
+                  <span className="text-xs text-dim">
+                    Changing it resets the attorney&apos;s deadline-table acknowledgment.
+                  </span>
+                </form>
 
                 {billingEnabled() && (
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-ink-line px-4 py-2.5">

@@ -1,6 +1,13 @@
 "use client";
 
-import { conductRules, disclaimerFor, REVIEW_RULES } from "@/lib/guardrails";
+import {
+  conductRules,
+  disclaimerFor,
+  IMMIGRATION_REVIEW_RULES,
+  REVIEW_RULES,
+  timeCriticalAckFor,
+} from "@/lib/guardrails";
+import type { PracticeArea } from "@/lib/schema";
 
 // The honesty panel. Everything shown here is imported from lib/guardrails.ts —
 // the same constants the extraction call and the reply pipeline actually use.
@@ -25,7 +32,37 @@ const NEVER = [
   },
 ];
 
-export default function GuardrailsPanel({ firmName }: { firmName: string }) {
+const IMMIGRATION_NEVER = [
+  {
+    title: "No legal advice",
+    body: "The engine routes inquiries. It never applies immigration law to a person's facts, never says 'you qualify,' never advises anyone what to do.",
+  },
+  {
+    title: "No predictions",
+    body: "It will not predict eligibility, approval odds, or processing times — and will not advise whether to file, travel, leave the country, or attend a hearing.",
+  },
+  {
+    title: "No status conclusions",
+    body: "It records what the sender says as something they said. It never states anyone's immigration status as a legal conclusion, and never asks for an A-number, passport, or SSN.",
+  },
+  {
+    title: "Nothing signed, nothing sent",
+    body: "Every draft is queued for a person. Time-critical leads alert the team immediately. The Send button is a human's finger, not a webhook.",
+  },
+];
+
+export default function GuardrailsPanel({
+  firmName,
+  practiceArea = "personal_injury",
+  variant = "demo",
+}: {
+  firmName: string;
+  practiceArea?: PracticeArea;
+  /** "demo" is the filmable sales demo (local store.json); "product" is a live firm. */
+  variant?: "demo" | "product";
+}) {
+  const immigration = practiceArea === "immigration";
+  const never = immigration ? IMMIGRATION_NEVER : NEVER;
   return (
     <div className="px-6 pt-6 pb-12 max-w-[1280px] mx-auto">
       <header className="max-w-2xl">
@@ -39,7 +76,7 @@ export default function GuardrailsPanel({ firmName }: { firmName: string }) {
       </header>
 
       <div className="grid grid-cols-4 gap-3 mt-6">
-        {NEVER.map((n, i) => (
+        {never.map((n, i) => (
           <div key={n.title} className="rounded-sm border-2 border-stamp/70 bg-ink-raised px-4 py-3.5">
             <div className="font-mono text-stamp text-sm pb-1">{String(i + 1).padStart(2, "0")}</div>
             <div className="font-display font-bold uppercase tracking-wide text-lg text-paper leading-tight">
@@ -56,7 +93,7 @@ export default function GuardrailsPanel({ firmName }: { firmName: string }) {
             The actual system prompt — conduct section, verbatim from lib/guardrails.ts
           </div>
           <pre className="rounded-sm border border-ink-line bg-ink-raised p-4 text-[13.5px] leading-relaxed font-mono whitespace-pre-wrap text-inktext/90">
-            {conductRules(firmName)}
+            {conductRules(firmName, practiceArea)}
           </pre>
         </section>
 
@@ -66,10 +103,26 @@ export default function GuardrailsPanel({ firmName }: { firmName: string }) {
               The disclaimer appended to every auto-reply — by code, not by the model
             </div>
             <div className="rounded-sm bg-paper text-papertext p-4 text-[14px] leading-snug space-y-3">
-              <p>{disclaimerFor("en", firmName)}</p>
-              <p className="border-t border-papertext/15 pt-3">{disclaimerFor("es", firmName)}</p>
+              <p>{disclaimerFor("en", firmName, practiceArea)}</p>
+              <p className="border-t border-papertext/15 pt-3">
+                {disclaimerFor("es", firmName, practiceArea)}
+              </p>
             </div>
           </section>
+
+          {immigration && (
+            <section>
+              <div className="field-label text-dim pb-2">
+                For a detained person or an imminent hearing — the draft is written by code
+              </div>
+              <div className="rounded-sm bg-paper text-papertext p-4 text-[14px] leading-snug space-y-3">
+                <p>{timeCriticalAckFor("en", firmName)}</p>
+                <p className="border-t border-papertext/15 pt-3">
+                  {timeCriticalAckFor("es", firmName)}
+                </p>
+              </div>
+            </section>
+          )}
 
           <section>
             <div className="field-label text-dim pb-2">Human review is forced when…</div>
@@ -86,25 +139,60 @@ export default function GuardrailsPanel({ firmName }: { firmName: string }) {
                 <span className="text-manila font-mono">▸</span> The routing is &ldquo;sign
                 now&rdquo; — the best cases get the most scrutiny, not the least
               </li>
+              {immigration && IMMIGRATION_REVIEW_RULES.forcedOnTimeCritical && (
+                <li className="flex gap-2.5">
+                  <span className="text-stamp font-mono">▸</span> The lead is time-critical — a
+                  person may be detained, or a hearing or deadline is within{" "}
+                  {IMMIGRATION_REVIEW_RULES.timeCriticalWindowDays} days. It is never routed to
+                  decline or follow-up, and the team is alerted at once.
+                </li>
+              )}
             </ul>
           </section>
 
           <section>
             <div className="field-label text-dim pb-2">Where the data lives</div>
             <div className="rounded-sm border border-ink-line bg-ink-raised p-4 text-[15px] space-y-2.5">
-              <p>
-                <span className="text-manila font-mono">▸</span> Client details stay in{" "}
-                <span className="font-mono text-sm">data/store.json</span> on the firm&apos;s own
-                machine. No analytics, no CRM sync, no third-party pixels.
-              </p>
-              <p>
-                <span className="text-manila font-mono">▸</span> One outbound call exists: the
-                message text goes to the Anthropic API for extraction, over TLS, and the
-                structured result comes back. That is the entire data path.
-              </p>
+              {variant === "product" ? (
+                <>
+                  <p>
+                    <span className="text-manila font-mono">▸</span> Your firm&apos;s leads live in
+                    the platform database. Every query is scoped to your firm — other firms
+                    cannot see them.
+                  </p>
+                  <p>
+                    <span className="text-manila font-mono">▸</span> The model&apos;s only data
+                    path: the message text goes to the Anthropic API for extraction, over TLS, and
+                    the structured result comes back.
+                  </p>
+                  <p>
+                    <span className="text-manila font-mono">▸</span> Approved replies go out
+                    through the email or text provider configured for your account. If the
+                    platform operator has connected a CRM (GoHighLevel), a summary of each
+                    processed lead is copied there — with no computed deadline until your
+                    attorney has acknowledged the deadline table.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p>
+                    <span className="text-manila font-mono">▸</span> Client details stay in{" "}
+                    <span className="font-mono text-sm">data/store.json</span> on the
+                    firm&apos;s own machine. No analytics, no CRM sync, no third-party pixels.
+                  </p>
+                  <p>
+                    <span className="text-manila font-mono">▸</span> One outbound call exists:
+                    the message text goes to the Anthropic API for extraction, over TLS, and the
+                    structured result comes back. That is the entire data path.
+                  </p>
+                </>
+              )}
               <p>
                 <span className="text-manila font-mono">▸</span> Filing deadlines come from a
-                reviewed table in <span className="font-mono text-sm">lib/sol-table.ts</span>{" "}
+                reviewed table in{" "}
+                <span className="font-mono text-sm">
+                  {immigration ? "lib/immigration-deadlines.ts" : "lib/sol-table.ts"}
+                </span>{" "}
                 plus date arithmetic. A model that hallucinates a deadline is a malpractice
                 generator, so the model is never asked for one.
               </p>

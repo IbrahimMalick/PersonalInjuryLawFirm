@@ -1,5 +1,5 @@
 import type { LeadRow } from "./db/schema";
-import type { CaseFile } from "./schema";
+import { contactOf, type AnyCaseFile } from "./casefile";
 
 // Where does the approved reply actually go? Prefer the contact details the
 // model extracted (a voicemail's spoken-aloud number beats caller ID);
@@ -19,9 +19,8 @@ function looksLikePhone(s: string): boolean {
   return /[\d()+\-\s]{7,}/.test(s) && !looksLikeEmail(s);
 }
 
-export function resolveReplyDestination(lead: LeadRow, cf: CaseFile): ReplyDestination | null {
-  const extractedPhone = cf.claimant.phone;
-  const extractedEmail = cf.claimant.email;
+export function resolveReplyDestination(lead: LeadRow, cf: AnyCaseFile): ReplyDestination | null {
+  const { phone: extractedPhone, email: extractedEmail } = contactOf(cf);
   const channelPhone = looksLikePhone(lead.fromAddress) ? lead.fromAddress : null;
   const channelEmail = looksLikeEmail(lead.fromAddress) ? lead.fromAddress : null;
 

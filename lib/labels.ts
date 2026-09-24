@@ -1,4 +1,9 @@
-import type { CaseType, Routing, TreatmentStatus } from "./schema";
+import type {
+  CurrentStatus,
+  ImmigrationCaseType,
+  NoticeType,
+} from "./immigration-schema";
+import type { CaseType, PracticeArea, Routing, TreatmentStatus } from "./schema";
 
 // Firm-side vocabulary. The UI never shows system enum values.
 
@@ -11,6 +16,49 @@ export const CASE_TYPE_LABEL: Record<CaseType, string> = {
   product_liability: "Product liability",
   other: "Other injury",
   not_a_case: "Not a case",
+};
+
+export const PRACTICE_AREA_LABEL: Record<PracticeArea, string> = {
+  personal_injury: "Personal injury",
+  immigration: "Immigration",
+};
+
+// What a firm's `practiceLine` (the free-text display label) defaults to when
+// left blank.
+export const DEFAULT_PRACTICE_LINE: Record<PracticeArea, string> = {
+  personal_injury: "Injury Law",
+  immigration: "Immigration Law",
+};
+
+export const IMMIGRATION_CASE_TYPE_LABEL: Record<ImmigrationCaseType, string> = {
+  family_based: "Family-based",
+  employment_based: "Employment-based",
+  asylum_humanitarian: "Asylum / humanitarian",
+  naturalization_citizenship: "Naturalization / citizenship",
+  status_change_extension: "Status change / extension",
+  removal_defense: "Removal defense",
+  daca_tps: "DACA / TPS",
+  other: "Other immigration",
+  not_a_case: "Not a case",
+};
+
+export const CURRENT_STATUS_LABEL: Record<CurrentStatus, string> = {
+  citizen: "Says they are a citizen",
+  lpr: "Says they are a green-card holder",
+  visa_holder: "Says they hold a visa",
+  pending_application: "Says an application is pending",
+  undocumented: "Says they have no status",
+  unknown: "Status not stated",
+};
+
+export const NOTICE_TYPE_LABEL: Record<NoticeType, string> = {
+  rfe: "Request for Evidence",
+  noid: "Notice of Intent to Deny",
+  nta: "Notice to Appear",
+  denial: "Denial",
+  approval: "Approval",
+  none: "No notice",
+  unknown: "Notice unclear",
 };
 
 export const TREATMENT_LABEL: Record<TreatmentStatus, string> = {

@@ -15,19 +15,17 @@ function normalize(s: string): string {
     .trim();
 }
 
-// Checks the extracted parties (and the raw text as a backstop) against the
-// firm's conflict list. Pure function — callers supply the list: the demo
-// loads data/adverse-parties.json, the product loads the adverse_parties
-// table. Returns human-readable flag strings for any match.
-export function matchConflicts(
-  output: ModelOutput,
+// The shared core: each practice area supplies the extracted names worth
+// checking, and the raw text is a backstop. Pure function — callers supply the
+// list: the demo loads data/adverse-parties.json, the product loads the
+// adverse_parties table. Returns human-readable flag strings for any match.
+export function matchNames(
+  names: (string | null | undefined)[],
   rawText: string,
   parties: ConflictParty[]
 ): string[] {
   const flags: string[] = [];
-  const haystacks = [output.otherPartyInfo.name, output.claimant.name, rawText].filter(
-    (s): s is string => Boolean(s)
-  );
+  const haystacks = [...names, rawText].filter((s): s is string => Boolean(s));
 
   for (const party of parties) {
     const needle = normalize(party.name);
@@ -37,6 +35,15 @@ export function matchConflicts(
     }
   }
   return flags;
+}
+
+// Personal injury: the other party and the claimant.
+export function matchConflicts(
+  output: ModelOutput,
+  rawText: string,
+  parties: ConflictParty[]
+): string[] {
+  return matchNames([output.otherPartyInfo.name, output.claimant.name], rawText, parties);
 }
 
 // Demo-only: the checked-in illustrative conflict list.

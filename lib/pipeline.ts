@@ -3,8 +3,15 @@ import { audit } from "./audit";
 import { ESCALATION_DELAY_SECONDS, notifyEscalation, notifyHighPriorityLead } from "./alerts";
 import { getDb, tables } from "./db";
 import type { LeadRow } from "./db/schema";
-import { buildCaseFile, extractModelOutput, type ExtractionInput } from "./extract";
+import {
+  contactOf,
+  isHighPriority,
+  isImmigrationCaseFile,
+  type AnyCaseFile,
+} from "./casefile";
+import type { ExtractionInput } from "./extract";
 import { getFirmById } from "./firm";
+import { processLeadForArea } from "./practice-areas";
 import { enqueue } from "./queue";
 import type { CaseFile, Channel } from "./schema";
 import { sendViaChannel } from "./channels/outbound";
@@ -27,6 +34,15 @@ function receivedLabel(iso: string, timezone: string): string {
   } catch {
     return iso;
   }
+}
+
+// The public immigration form asks "is anyone currently detained?" — the one
+// explicit yes/no we can hand to code as a backstop for the model's reading.
+export const FORM_DETAINED_KEY = "Currently detained";
+
+function formDetainedAnswer(lead: LeadRow): boolean | undefined {
+  const fields = (lead.meta as { formFields?: Record<string, string> } | null)?.formFields;
+  return fields?.[FORM_DETAINED_KEY] === "Yes" ? true : undefined;
 }
 
 function toExtractionInput(lead: LeadRow, timezone: string): ExtractionInput {
@@ -68,12 +84,16 @@ export async function runProcessLead(leadId: string): Promise<void> {
       )
   ).map((p) => ({ name: p.name, relationship: p.relationship }));
 
-  const result = await extractModelOutput(toExtractionInput(lead, firm.timezone), {
-    firmName: `${firm.name} ${firm.practiceLine}`.trim(),
-    allowFallback: false, // throws on failure → worker retries → dead → needs_attention
+  // Throws on failure → worker retries → dead → needs_attention. A real
+  // inquiry never gets a canned answer, in any practice area.
+  const result = await processLeadForArea(firm.practiceArea, {
+    input: toExtractionInput(lead, firm.timezone),
+    firm: { name: firm.name, practiceLine: firm.practiceLine },
+    rawText: lead.raw,
+    parties,
+    formDetained: formDetainedAnswer(lead),
   });
-
-  const { caseFile, draftReply } = buildCaseFile(result.output, lead.raw, parties);
+  const { caseFile, draftReply } = result;
 
   await db
     .update(tables.leads)
@@ -81,7 +101,7 @@ export async function runProcessLead(leadId: string): Promise<void> {
       status: "triaged",
       caseFile: caseFile as unknown as Record<string, unknown>,
       draftReply,
-      draftLanguage: caseFile.claimant.preferredLanguage ?? "en",
+      draftLanguage: contactOf(caseFile).preferredLanguage ?? "en",
       processedAt: new Date().toISOString(),
       processingError: null,
     })
@@ -93,6 +113,7 @@ export async function runProcessLead(leadId: string): Promise<void> {
     detail: {
       routing: caseFile.routing,
       priority: caseFile.priorityScore,
+      practiceArea: firm.practiceArea,
       caseType: caseFile.caseType,
       confidence: caseFile.confidence,
       needsHumanReview: caseFile.needsHumanReview,
@@ -106,10 +127,20 @@ export async function runProcessLead(leadId: string): Promise<void> {
     await audit("conflict.flagged", { firmId: lead.firmId, leadId, detail: { match: flag } });
   }
 
+  // Immigration: a detained person or an imminent hearing is a liberty issue.
+  // Record which categories fired (coarse — never dates) for the audit trail.
+  if (isImmigrationCaseFile(caseFile) && caseFile.timeCritical) {
+    await audit("lead.time_critical", {
+      firmId: lead.firmId,
+      leadId,
+      detail: { reasons: caseFile.timeCriticalReasons },
+    });
+  }
+
   // The AI read this at 3 AM — that only matters if a person finds out now,
   // not whenever they next happen to open the inbox. Never let an alert
   // failure fail the triage that already succeeded.
-  if (caseFile.routing === "sign_now") {
+  if (isHighPriority(caseFile)) {
     try {
       await notifyHighPriorityLead(lead, caseFile, firm.name);
       await audit("lead.alert_sent", { firmId: lead.firmId, leadId, detail: { channel: "email" } });
@@ -127,6 +158,7 @@ export async function runProcessLead(leadId: string): Promise<void> {
     raw: lead.raw,
     firmName: firm.name,
     caseFile,
+    deadlinesVisible: Boolean(firm.solAcknowledgedAt),
   });
 }
 
@@ -162,10 +194,11 @@ export async function markLeadNeedsAttention(leadId: string, error: string): Pro
 }
 
 /**
- * Fires ESCALATION_DELAY_SECONDS after a "sign_now" lead is triaged. A no-op
- * if it's since been replied to, archived, or re-triaged away from sign_now
- * — so re-running triage on the same lead can leave a stale reminder queued
- * without it saying anything wrong.
+ * Fires ESCALATION_DELAY_SECONDS after a high-priority lead ("sign_now", or an
+ * immigration lead flagged time-critical) is triaged. A no-op if it's since
+ * been replied to, archived, or re-triaged away from high priority — so
+ * re-running triage on the same lead can leave a stale reminder queued without
+ * it saying anything wrong.
  */
 export async function runEscalateLead(leadId: string): Promise<void> {
   const db = await getDb();
@@ -183,8 +216,8 @@ export async function runEscalateLead(leadId: string): Promise<void> {
   )[0];
   if (replied) return;
 
-  const caseFile = (lead.caseFile as unknown as CaseFile | null) ?? null;
-  if (!caseFile || caseFile.routing !== "sign_now") return;
+  const caseFile = (lead.caseFile as unknown as AnyCaseFile | null) ?? null;
+  if (!caseFile || !isHighPriority(caseFile)) return;
 
   const firm = await getFirmById(lead.firmId);
   if (!firm) return;

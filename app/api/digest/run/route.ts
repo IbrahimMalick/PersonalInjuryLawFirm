@@ -10,7 +10,7 @@ import {
   type InsightMessage,
   type WeeklyDigestSummary,
 } from "@/lib/insights";
-import type { CaseFile } from "@/lib/schema";
+import type { AnyCaseFile } from "@/lib/casefile";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -94,7 +94,7 @@ export async function GET(request: Request) {
       id: r.id,
       receivedAt: r.receivedAt,
       status: r.status,
-      routing: r.caseFile ? ((r.caseFile as unknown as CaseFile).routing ?? null) : null,
+      routing: r.caseFile ? ((r.caseFile as unknown as AnyCaseFile).routing ?? null) : null,
     }));
     const summary = weeklyDigestSummary(leads, messages);
 

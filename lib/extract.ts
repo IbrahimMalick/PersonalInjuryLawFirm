@@ -71,15 +71,9 @@ Field notes:
   conduct rules above. Do not add a signature block or disclaimer — the
   application appends the firm's standard disclaimer.`;
 
-function buildPrompt(
-  input: ExtractionInput,
-  firmName: string,
-  today: string
-): { system: string; user: string } {
-  const system =
-    conductRules(firmName) +
-    "\n" +
-    OUTPUT_CONTRACT.replace("{{TODAY}}", today).replace("{{RECEIVED}}", input.receivedLabel);
+// The user-turn message — how the inbound message reached the firm. Shared by
+// every practice area.
+export function buildUserMessage(input: ExtractionInput): string {
   const dur = input.meta?.durationSec;
   const channelDesc: Record<string, string> = {
     voicemail: `Voicemail transcript from ${input.from}${dur ? ` (${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, "0")})` : ""}`,
@@ -88,14 +82,26 @@ function buildPrompt(
     whatsapp: `WhatsApp message from ${input.displayName ?? "unknown"} (${input.from})${input.meta?.photos?.length ? ` with ${input.meta.photos.length} photo attachments: ${input.meta.photos.join(", ")}` : ""}`,
     email: `Email from ${input.displayName ? `${input.displayName} <${input.from}>` : input.from}${input.meta?.subject ? ` — subject: ${input.meta.subject}` : ""}`,
   };
-  return { system, user: `${channelDesc[input.channel]}:\n\n${input.raw}` };
+  return `${channelDesc[input.channel]}:\n\n${input.raw}`;
+}
+
+// The personal-injury system prompt: conduct rules + output contract.
+function personalInjurySystem(input: ExtractionInput, firmName: string, today: string): string {
+  return (
+    conductRules(firmName) +
+    "\n" +
+    OUTPUT_CONTRACT.replace("{{TODAY}}", today).replace("{{RECEIVED}}", input.receivedLabel)
+  );
 }
 
 // ── Defensive parsing ────────────────────────────────────────────────────────
 
 export class ExtractionError extends Error {}
 
-export function parseDefensively(text: string): ModelOutput {
+// Strip fences/preamble and parse the JSON object out of a model response.
+// Shared by every practice area; each validates the result against its own zod
+// schema (see parseDefensively and lib/immigration.ts).
+export function parseJsonObject(text: string): unknown {
   let candidate = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
   const first = candidate.indexOf("{");
   const last = candidate.lastIndexOf("}");
@@ -104,14 +110,19 @@ export function parseDefensively(text: string): ModelOutput {
   }
   candidate = candidate.slice(first, last + 1);
 
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(candidate);
+    return JSON.parse(candidate);
   } catch (e) {
     throw new ExtractionError(`Response was not valid JSON: ${(e as Error).message}`);
   }
+}
 
-  const result = zModelOutput.safeParse(parsed);
+/** Validate parsed JSON against a zod schema, with the same error shape everywhere. */
+export function validateWith<T>(
+  schema: { safeParse: (v: unknown) => { success: true; data: T } | { success: false; error: { issues: { path: PropertyKey[]; message: string }[] } } },
+  parsed: unknown
+): T {
+  const result = schema.safeParse(parsed);
   if (!result.success) {
     const issue = result.error.issues[0];
     throw new ExtractionError(
@@ -119,6 +130,10 @@ export function parseDefensively(text: string): ModelOutput {
     );
   }
   return result.data;
+}
+
+export function parseDefensively(text: string): ModelOutput {
+  return validateWith<ModelOutput>(zModelOutput, parseJsonObject(text));
 }
 
 // Demo-only: the "Break it" lead's first attempt is deliberately corrupted so
@@ -135,29 +150,39 @@ function corruptForBreakDemo(text: string): string {
 
 // ── Model call ───────────────────────────────────────────────────────────────
 
-async function fetchResponseText(
+// What an area plugs into the shared retry-once extraction: how to build its
+// system prompt, how to parse and validate its response, and — demo only — how
+// to serve a cached response when there's no API key.
+export interface AreaExtractor<T> {
+  system: (today: string) => string;
+  parse: (text: string) => T;
+  cachedResponse?: () => string; // demo only; product areas never set this
+  corruptFirstAttempt?: (text: string) => string; // demo "break it" only
+}
+
+async function fetchResponseText<T>(
   input: ExtractionInput,
-  firmName: string,
+  area: AreaExtractor<T>,
   priorError: string | null,
   allowFallback: boolean
 ): Promise<string> {
   const haveKey = Boolean(process.env.ANTHROPIC_API_KEY);
   if (!haveKey) {
-    if (!allowFallback) {
+    if (!allowFallback || !area.cachedResponse) {
       throw new ExtractionError("ANTHROPIC_API_KEY is not configured");
     }
     // Demo without a key: serve the cached result as the "response" so every
     // downstream path (parsing, validation, break-it) still runs for real.
     console.warn(`[nightshift] no API key — using cached result for ${input.id}`);
-    const fb = fallbackFor(input.id);
-    if (!fb) throw new ExtractionError(`No cached result for ${input.id}`);
-    return JSON.stringify(fb);
+    return area.cachedResponse();
   }
 
   const client = new Anthropic();
   const today = new Date().toISOString().slice(0, 10);
-  const { system, user } = buildPrompt(input, firmName, today);
-  const messages: Anthropic.MessageParam[] = [{ role: "user", content: user }];
+  const system = area.system(today);
+  const messages: Anthropic.MessageParam[] = [
+    { role: "user", content: buildUserMessage(input) },
+  ];
   if (priorError) {
     messages.push({
       role: "user",
@@ -179,19 +204,25 @@ async function fetchResponseText(
 
 // ── Orchestration: attempt → retry once → (demo only) cached fallback ────────
 
-export interface ExtractionResult {
-  output: ModelOutput;
+export interface AreaExtraction<T> {
+  output: T;
   via: "live" | "fallback";
   retried: boolean;
   retryReason: string | null;
 }
+export type ExtractionResult = AreaExtraction<ModelOutput>;
 
-export async function extractModelOutput(
+// The shared extraction loop every practice area runs through. Product
+// behavior is identical for all of them: one retry on a parse or validation
+// failure, and then — for a real inquiry — a thrown error. Only the demo
+// (allowFallback) may substitute a cached result.
+export async function extractWithArea<T>(
   input: ExtractionInput,
-  opts: { firmName: string; allowFallback: boolean }
-): Promise<ExtractionResult> {
+  area: AreaExtractor<T>,
+  opts: { allowFallback: boolean; fallbackOutput?: () => T | null }
+): Promise<AreaExtraction<T>> {
   const live = Boolean(process.env.ANTHROPIC_API_KEY);
-  let output: ModelOutput | null = null;
+  let output: T | null = null;
   let retried = false;
   let retryReason: string | null = null;
   let lastError: Error | null = null;
@@ -200,12 +231,12 @@ export async function extractModelOutput(
     try {
       let text = await fetchResponseText(
         input,
-        opts.firmName,
+        area,
         attempt > 0 ? (lastError?.message ?? null) : null,
         opts.allowFallback
       );
-      if (input.breakIt && attempt === 0) text = corruptForBreakDemo(text);
-      output = parseDefensively(text);
+      if (area.corruptFirstAttempt && attempt === 0) text = area.corruptFirstAttempt(text);
+      output = area.parse(text);
     } catch (e) {
       lastError = e as Error;
       if (attempt === 0) {
@@ -229,9 +260,30 @@ export async function extractModelOutput(
   console.warn(
     `[nightshift] falling back to cached result for ${input.id} after retry: ${lastError?.message}`
   );
-  const fb = fallbackFor(input.id);
+  const fb = opts.fallbackOutput?.() ?? null;
   if (!fb) throw new ExtractionError(`Extraction failed and no cached fallback for ${input.id}`);
   return { output: fb, via: "fallback", retried, retryReason };
+}
+
+// Personal injury (and the demo). Signature and behavior unchanged.
+export async function extractModelOutput(
+  input: ExtractionInput,
+  opts: { firmName: string; allowFallback: boolean }
+): Promise<ExtractionResult> {
+  return extractWithArea<ModelOutput>(
+    input,
+    {
+      system: (today) => personalInjurySystem(input, opts.firmName, today),
+      parse: parseDefensively,
+      cachedResponse: () => {
+        const fb = fallbackFor(input.id);
+        if (!fb) throw new ExtractionError(`No cached result for ${input.id}`);
+        return JSON.stringify(fb);
+      },
+      corruptFirstAttempt: input.breakIt ? corruptForBreakDemo : undefined,
+    },
+    { allowFallback: opts.allowFallback, fallbackOutput: () => fallbackFor(input.id) }
+  );
 }
 
 // ── The trust boundary ───────────────────────────────────────────────────────

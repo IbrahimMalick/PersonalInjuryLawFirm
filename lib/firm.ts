@@ -2,6 +2,8 @@ import crypto from "crypto";
 import { eq } from "drizzle-orm";
 import { getDb, tables } from "./db";
 import type { FirmRow } from "./db/schema";
+import { DEFAULT_PRACTICE_LINE } from "./labels";
+import type { PracticeArea } from "./schema";
 
 export async function getFirmById(id: number): Promise<FirmRow | null> {
   const db = await getDb();
@@ -41,7 +43,11 @@ function slugify(name: string): string {
 }
 
 /** Create a firm with a unique slug and a fresh email-inbound token. */
-export async function createFirm(name: string, practiceLine: string): Promise<FirmRow> {
+export async function createFirm(
+  name: string,
+  practiceLine: string,
+  practiceArea: PracticeArea = "personal_injury"
+): Promise<FirmRow> {
   const db = await getDb();
   const base = slugify(name);
   for (let attempt = 0; attempt < 20; attempt++) {
@@ -52,7 +58,8 @@ export async function createFirm(name: string, practiceLine: string): Promise<Fi
         .values({
           slug,
           name,
-          practiceLine: practiceLine || "Injury Law",
+          practiceArea,
+          practiceLine: practiceLine.trim() || DEFAULT_PRACTICE_LINE[practiceArea],
           emailInboundToken: crypto.randomBytes(24).toString("base64url"),
         })
         .returning();
