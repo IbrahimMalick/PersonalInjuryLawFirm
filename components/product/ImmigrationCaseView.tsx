@@ -1,3 +1,4 @@
+import { splitStatusDetail } from "@/lib/casefile";
 import { CURRENT_STATUS_LABEL, NOTICE_TYPE_LABEL } from "@/lib/labels";
 import type { ImmigrationCaseFile } from "@/lib/immigration-schema";
 
@@ -41,6 +42,7 @@ export default function ImmigrationCaseView({
   cf: ImmigrationCaseFile;
   deadlinesVisible: boolean;
 }) {
+  const statusDetail = splitStatusDetail(cf.currentStatusDetail);
   const soonest = cf.soonestDeadline;
   const soonestUrgent = soonest?.daysRemaining != null && soonest.daysRemaining < 30;
 
@@ -99,8 +101,11 @@ export default function ImmigrationCaseView({
         <div className="field-label text-dim">What the sender told us</div>
         <div className="font-display font-bold uppercase tracking-wide text-2xl mt-2 text-inktext">
           {CURRENT_STATUS_LABEL[cf.currentStatus]}
-          {cf.currentStatusDetail ? ` · ${cf.currentStatusDetail}` : ""}
+          {statusDetail.inline ? ` · ${statusDetail.inline}` : ""}
         </div>
+        {statusDetail.note && (
+          <p className="text-sm text-dim mt-1.5 leading-snug">{statusDetail.note}</p>
+        )}
         <div className="mt-3 space-y-1 font-mono text-sm">
           <div>
             <span className="text-dim">Citizenship · </span>

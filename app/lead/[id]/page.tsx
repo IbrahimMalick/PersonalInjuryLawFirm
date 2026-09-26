@@ -10,6 +10,7 @@ import { requireFirmUser } from "@/lib/auth";
 import {
   caseTypeLabelOf,
   contactOf,
+  guidanceSentence,
   isImmigrationCaseFile,
   practiceAreaOf,
   type AnyCaseFile,
@@ -438,7 +439,7 @@ export default async function LeadReview({ params }: { params: Promise<{ id: str
             )}
             {cf && (
               <p className="text-sm text-dim mt-3 px-1">
-                {ROUTING_SENTENCE[cf.routing]}
+                {guidanceSentence(cf, ROUTING_SENTENCE[cf.routing])}
                 {cf.needsHumanReview ? " · Flagged for human review." : ""}
               </p>
             )}

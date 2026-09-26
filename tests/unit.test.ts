@@ -6,7 +6,14 @@ import { resolveReplyDestination } from "../lib/reply";
 import type { LeadRow } from "../lib/db/schema";
 import type { ModelOutput } from "../lib/schema";
 import { matchNames } from "../lib/conflicts";
-import { contactOf, isHighPriority, isImmigrationCaseFile, practiceAreaOf } from "../lib/casefile";
+import {
+  contactOf,
+  guidanceSentence,
+  isHighPriority,
+  isImmigrationCaseFile,
+  practiceAreaOf,
+  splitStatusDetail,
+} from "../lib/casefile";
 import {
   CONDUCT_RULES_TEMPLATE,
   conductRules,
@@ -19,7 +26,11 @@ import {
   computeTimeCritical,
   type ImmigrationTriggers,
 } from "../lib/immigration-deadlines";
-import { buildImmigrationCaseFile, parseImmigrationDefensively } from "../lib/immigration";
+import {
+  buildImmigrationCaseFile,
+  immigrationExtractor,
+  parseImmigrationDefensively,
+} from "../lib/immigration";
 import type { ImmigrationModelOutput } from "../lib/immigration-schema";
 import { leadUrgency } from "../lib/urgency";
 import { noteBody } from "../lib/channels/ghl-sync";
@@ -594,5 +605,34 @@ describe("GoHighLevel note honours the deadline-acknowledgment gate", () => {
     expect(hidden).not.toMatch(/Deadline:/);
     expect(hidden).toMatch(/TIME-CRITICAL: Person may be detained/);
     expect(noteBody({ ...baseInput, caseFile, deadlinesVisible: true })).toMatch(/Deadline:\s+Response to Request for Evidence — 2026-11-24/);
+  });
+});
+
+describe("staff-facing text (immigration)", () => {
+  it("tells the model to write staff-facing fields in English and keep the status detail short", () => {
+    const system = immigrationExtractor({} as never, FIRM).system("2026-09-26").replace(/\s+/g, " ");
+    expect(system).toMatch(/Write scoreRationale, missingInfo, and currentStatusDetail in ENGLISH/);
+    expect(system).toMatch(/Only draftReply follows the sender's language/);
+    expect(system).toMatch(/SHORT label only/);
+    expect(system).toMatch(/40 characters at most/);
+    expect(system).toMatch(/Never a sentence/);
+  });
+  it("splits a short status detail inline and a long one into a note, never dropping it", () => {
+    expect(splitStatusDetail("F-1")).toEqual({ inline: "F-1", note: null });
+    expect(splitStatusDetail("  expired visitor visa ")).toEqual({ inline: "expired visitor visa", note: null });
+    const long = "The sender's brother was arrested by immigration officers this morning and taken to a detention center.";
+    expect(splitStatusDetail(long)).toEqual({ inline: null, note: long });
+    expect(splitStatusDetail("x".repeat(40)).inline).toHaveLength(40);
+    expect(splitStatusDetail("x".repeat(41)).inline).toBeNull();
+    expect(splitStatusDetail(null)).toEqual({ inline: null, note: null });
+    expect(splitStatusDetail("   ")).toEqual({ inline: null, note: null });
+  });
+  it("replaces the routing line with 'call now' for time-critical leads only", () => {
+    const line = "Strong case — call first thing and send the retainer";
+    const critical = build(withRemoval({ isDetained: true }), "", [], {}).caseFile;
+    expect(guidanceSentence(critical, line)).toBe("Time-critical — call now, do not wait for morning");
+    expect(guidanceSentence(build(immOutput).caseFile, line)).toBe(line);
+    // personal injury is untouched
+    expect(guidanceSentence(buildCaseFile(validOutput, "", []).caseFile, line)).toBe(line);
   });
 });
