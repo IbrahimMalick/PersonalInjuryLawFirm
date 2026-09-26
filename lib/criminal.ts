@@ -60,8 +60,12 @@ Field notes:
 - WHAT HAPPENED: NEVER record, summarize, quote, or repeat what the person is
   accused of doing, or any account of events. Anything written here could be used
   against the person. Leave narrative out of EVERY field. chargesStated holds only
-  the charge NAMES as stated ("DUI", "possession", "assault") — labels, never a
-  description. scoreRationale is one short plain sentence about how urgently the
+  charge NAMES that the sender actually WROTE ("DUI", "possession", "assault") —
+  labels, never a description. NEVER work out a charge from described conduct: if
+  the sender says someone "hit a guy" or "drove home drunk" but names no charge,
+  chargesStated is [] — do not write "assault" or "DUI" for them. caseType follows
+  the same rule: choose it from a charge the sender named; if none was named, use
+  "other" (or "not_a_case" if it is not a criminal matter). scoreRationale is one short plain sentence about how urgently the
   firm should call (for example "Family member reports an arrest and an upcoming
   court date"), never about the facts of the incident.
 - custody.inCustody: true only if the message or the form says someone is being
@@ -127,6 +131,27 @@ export interface BuildCriminalOptions {
 
 const RATIONALE_MAX = 200;
 
+const STOPWORDS = new Set(["the", "and", "for", "with", "not", "her", "his", "was"]);
+
+/**
+ * A charge label is kept only if the sender actually wrote it. The model is told
+ * never to work a charge out of described conduct, but "hit a guy" -> "assault"
+ * is exactly the slip a prompt can't guarantee against, so code checks: at least
+ * one significant word of the label (compared by its first six letters, so
+ * "assault" matches "assaulted") must appear in the message text. Fails safe —
+ * an unmatched label is dropped, never invented.
+ */
+export function chargesSaidBySender(charges: string[], rawText: string): string[] {
+  const text = rawText.toLowerCase();
+  return charges.filter((c) =>
+    c
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((w) => w.length >= 3 && !STOPWORDS.has(w))
+      .some((w) => text.includes(w.slice(0, 6)))
+  );
+}
+
 /** Keep the rationale to its first sentence — a long one is where narrative creeps in. */
 function shortRationale(text: string): string {
   const cleaned = stripStatedDeadlines(text).trim();
@@ -156,9 +181,17 @@ export function buildCriminalCaseFile(
   const inCustody: boolean | "unknown" =
     opts.formInCustody === true ? true : output.custody.inCustody;
 
+  const chargesStated = chargesSaidBySender(output.chargesStated, rawText);
+  // No charge named by the sender: the case type was worked out from the story.
+  // Don't keep it (it would record the conduct under another name).
+  const caseType =
+    output.chargesStated.length > 0 && chargesStated.length === 0 && output.caseType !== "not_a_case"
+      ? "other"
+      : output.caseType;
+
   const { deadlines, soonest } = computeCriminalDeadlines(
     {
-      caseType: output.caseType,
+      caseType,
       inCustody,
       arrestDate: output.custody.arrestDate,
       nextCourtDate: output.court.nextCourtDate,
@@ -192,13 +225,13 @@ export function buildCriminalCaseFile(
 
   const caseFile: CriminalCaseFile = {
     practiceArea: "criminal_defense",
-    caseType: output.caseType,
+    caseType,
     contact: output.contact,
     writerRole: output.writerRole,
     defendantName: output.defendantName,
     custody: { ...output.custody, inCustody },
     court: output.court,
-    chargesStated: output.chargesStated,
+    chargesStated,
     onProbationOrParole: output.onProbationOrParole,
     hasActiveWarrant: output.hasActiveWarrant,
     namedParties: output.namedParties,
