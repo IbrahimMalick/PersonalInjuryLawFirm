@@ -67,8 +67,15 @@ Field notes:
 - noticeReceived.type: "rfe" (request for evidence), "noid" (notice of intent
   to deny), "nta" (notice to appear in immigration court), "denial", "approval",
   "none" if they received no notice, "unknown" if unclear.
-- removal.isDetained: true only if the sender says the person is in
-  immigration detention or was just detained; otherwise false or "unknown".
+- removal.isDetained: true only if the message or the form says someone is in
+  immigration detention or was just detained; otherwise false or "unknown". A
+  form line "Is anyone currently detained? ... : Yes" means SOMEONE is detained —
+  not necessarily the sender. Never write that the sender themself is detained
+  unless they say so; if it is unclear who, add a missingInfo question about it.
+- NO DEADLINES ANYWHERE: never state, estimate, or compute a deadline, due date,
+  response window, or number of days remaining in ANY field — including
+  scoreRationale and missingInfo. Application code computes those. You may quote a
+  date the sender gave as a fact ("received a notice dated September 15").
 - namedParties: other people or employers named in the message (family
   members, an employer). Used only for the firm's conflict check.
 - priorityScore: 0-100, how strongly the firm should want to speak to this
@@ -100,6 +107,27 @@ export function immigrationExtractor(
     parse: parseImmigrationDefensively,
     // No cachedResponse: a real inquiry never gets a canned answer.
   };
+}
+
+// Deadlines are computed by code and hidden until an attorney acknowledges the
+// table. The prompt forbids the model from stating one in free text, but a
+// prompt is a request, not a guarantee — this is the backstop. A clause is
+// removed only when it BOTH talks about a deadline AND carries a date or a
+// count of days/weeks/months, so "RFE dated September 15" and "the response
+// deadline is unknown" survive while "response due December 8" and "you have 84
+// days" do not. It is a heuristic (English and Spanish wording); it fails safe
+// by removing text, never by failing a lead.
+const DEADLINE_WORDS =
+  /\b(?:deadline|due|expires?|expiring|expiry|no later than|within\s+\d+|must\s+(?:be\s+)?(?:file|filed|respond|answer|submit|submitted)|\d+\s*(?:days?|weeks?|months?)\s+(?:left|remaining|to\s+(?:file|respond|answer|submit|appeal|reply))|vence|vencimiento|plazo|(?:días|semanas|meses)\s+para|le\s+quedan)\b/i;
+const DATE_OR_COUNT =
+  /\b\d{4}-\d{2}-\d{2}\b|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}\b|\b\d{1,2}\s+de\s+[a-záéíóú]+|\b\d+\s*(?:days?|weeks?|months?|días|semanas|meses)\b/i;
+
+export function stripStatedDeadlines(text: string): string {
+  return text
+    .split(/(?<=[.;!?])\s+/)
+    .filter((clause) => !(DEADLINE_WORDS.test(clause) && DATE_OR_COUNT.test(clause)))
+    .join(" ")
+    .trim();
 }
 
 /** Names worth checking against the conflict list for an immigration lead. */
@@ -193,9 +221,10 @@ export function buildImmigrationCaseFile(
     timeCritical: tc.timeCritical,
     timeCriticalReasons: tc.reasons,
     priorityScore: Math.round(output.priorityScore),
-    scoreRationale: output.scoreRationale,
+    // Free text is never allowed to carry a deadline past the acknowledgment gate.
+    scoreRationale: stripStatedDeadlines(output.scoreRationale) || "See the message below.",
     routing,
-    missingInfo: output.missingInfo,
+    missingInfo: output.missingInfo.map(stripStatedDeadlines).filter(Boolean),
     conflictFlags,
     confidence: output.confidence,
     needsHumanReview,

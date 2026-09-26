@@ -103,7 +103,9 @@ export async function POST(request: Request) {
       extraFields["Country of citizenship"] = country;
     }
     if (detained) {
-      extraLines.push(`Currently detained: ${detained}`);
+      // Worded as the question the form actually asks, so the model doesn't
+      // read a "Yes" as "the sender is detained" — it means someone is.
+      extraLines.push(`Is anyone currently detained? (form question, answered by sender): ${detained}`);
       extraFields["Currently detained"] = detained;
     }
     if (keyDate) {
