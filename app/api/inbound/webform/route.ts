@@ -114,12 +114,45 @@ export async function POST(request: Request) {
     }
   }
 
+  // Criminal-defense firms' form: is the person in custody, the next court date,
+  // and the court. Same idea — appended for the model AND kept as formFields, so
+  // the "in custody" answer reaches code as a backstop (lib/pipeline.ts). The
+  // form asks for no account of events, and nothing here does either.
+  if (firm.practiceArea === "criminal_defense") {
+    const custodyRaw = (fields.inCustody ?? "").trim().toLowerCase();
+    const courtDateRaw = (fields.courtDate ?? "").trim();
+    const court = (fields.court ?? "").trim().slice(0, 150);
+    const custody =
+      custodyRaw === "yes"
+        ? "Yes"
+        : custodyRaw === "no"
+          ? "No"
+          : custodyRaw === "unsure"
+            ? "Not sure"
+            : "";
+    const courtDate = /^\d{4}-\d{2}-\d{2}$/.test(courtDateRaw) ? courtDateRaw : "";
+    if (custody) {
+      // Worded as the question the form actually asks: the PERSON ARRESTED is
+      // held, not necessarily the sender.
+      extraLines.push(`Is the person currently in custody? (form question, answered by sender): ${custody}`);
+      extraFields["In custody"] = custody;
+    }
+    if (courtDate) {
+      extraLines.push(`Next court date (as given by sender): ${courtDate}`);
+      extraFields["Next court date"] = courtDate;
+    }
+    if (court) {
+      extraLines.push(`County or court (as given by sender): ${court}`);
+      extraFields["County or court"] = court;
+    }
+  }
+
   const raw = [
     `First name: ${firstName || "(blank)"}`,
     `Last name: ${lastName || "(blank)"}`,
     `Phone: ${phone || "(blank)"}`,
     `Email: ${email || "(blank)"}`,
-    `How can we help?: ${message || "(blank)"}`,
+    `${firm.practiceArea === "criminal_defense" ? "Who was arrested or charged, and where are they now?" : "How can we help?"}: ${message || "(blank)"}`,
     ...extraLines,
   ].join("\n");
 

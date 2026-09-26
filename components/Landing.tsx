@@ -199,6 +199,75 @@ const IMMIGRATION_FAQS = [
   },
 ];
 
+// ── Criminal defense copy ────────────────────────────────────────────────────
+// Claims about what the product actually does for a criminal-defense firm — no
+// invented stats, no testimonials. The distinctive claim is true by construction:
+// the case file has no field for what allegedly happened, and the reply is fixed
+// text that asks the sender not to describe it.
+
+const CRIMINAL_CHECKLIST = [
+  "Reads voicemail, text, WhatsApp, email, and your web form — including Spanish",
+  "Builds a case file: who, where they are, the court calendar — never what happened",
+  "Flags a person in custody, a warrant, or a court date this week for immediate attention",
+  "Sends fixed, reviewed wording — a human approves every send",
+];
+
+const CRIMINAL_GUARANTEES = [
+  { mark: "☑", text: "Nothing sends without a human clicking approve" },
+  { mark: "⏱", text: "Court dates and deadlines computed from a reviewed table — never guessed by AI" },
+  { mark: "⛔", text: "No legal advice, no predictions about outcomes, pleas, or sentences" },
+  { mark: "▤", text: "Every action lands in an append-only audit trail" },
+];
+
+const CRIMINAL_CARDS = [
+  {
+    n: "01",
+    title: "Records who and where — not what happened",
+    body: "A frantic voicemail from a mother, a text from a jail phone, a half-empty form — each becomes a case file: who was arrested, where they are held, the court and next date, the charge as named, and the questions intake still needs to ask. It has no field for the incident, so it cannot record one.",
+  },
+  {
+    n: "02",
+    title: "Knows what it must never do",
+    body: "No legal advice. No predictions about outcomes, pleas, or sentences. No advice on talking to police, posting bail, or attending court. The reply is fixed wording written by code — the model never drafts it — and asks the sender not to describe what happened. Deadlines come from a reviewed table and stay hidden until an attorney at your firm signs off on it.",
+  },
+  {
+    n: "03",
+    title: "Your finger on Send",
+    body: "Every reply waits on your review screen, editable, with edits logged. A person in custody, an active warrant, or a court date within a week is flagged time-critical by code, alerts your team at once, and is never routed to decline or follow-up — still sent only when a person approves it.",
+  },
+];
+
+const CRIMINAL_FAQS = [
+  {
+    q: "Does Nightshift give legal advice?",
+    a: "No — by construction, not by promise. The system prompt forbids legal advice, predictions about outcomes, pleas, or sentences, and advice on whether to talk to police, waive a right, post bail, or attend court. Every reply carries a disclaimer appended by application code, in the sender's language.",
+  },
+  {
+    q: "What if someone writes about what happened?",
+    a: "The case file has no field for it, and the model is told never to record or repeat it. The reply — fixed wording, not model-written — asks the sender not to describe events in a text, email, or voicemail and says the attorney will speak with them directly. One honest limit: the message itself is stored as it was received, and your team can read it. Nightshift cannot stop someone typing it; it can decline to spread it.",
+  },
+  {
+    q: "What happens when someone is in custody or a court date is close?",
+    a: "Code — not the model — flags it time-critical. It is never routed to decline or follow-up, your team is emailed immediately (and reminded 30 minutes later if no one has replied), and the reply is the fixed urgent wording. A person still approves the send.",
+  },
+  {
+    q: "Who decides the deadlines?",
+    a: "Your attorney does. Court dates come from what the sender states; windows such as an appeal or a DUI license-hearing request are computed from a reviewed table plus date arithmetic, never from the AI. They vary by state and court, so they stay hidden from reviewers until an attorney at your firm reviews the table and acknowledges it in Settings.",
+  },
+  {
+    q: "Will this replace our intake staff?",
+    a: "No. Nightshift reads, sorts, scores, and flags. A person at your firm reviews and approves every outbound reply before it sends — edits included and logged.",
+  },
+  {
+    q: "What if a lead matches an existing client or an adverse party?",
+    a: "It's checked against your firm's conflict list automatically — the person charged, the sender, a co-defendant, or a named complainant. A match holds the reply and requires an admin to release it.",
+  },
+  {
+    q: "What channels and languages does it cover?",
+    a: "Voicemail, SMS, WhatsApp, email, and your web intake form. The public form and the reply are in English and Spanish, and the reply follows the sender's language.",
+  },
+];
+
 interface HeroMedia {
   src: string;
   alt: string;
@@ -249,11 +318,27 @@ const AREA_COPY: Record<PracticeArea, AreaCopy> = {
     cards: IMMIGRATION_CARDS,
     faqs: IMMIGRATION_FAQS,
   },
+  criminal_defense: {
+    media: {
+      src: "/screenshot-criminal.png",
+      alt: "Nightshift's criminal-defense case screen for a sample lead: a red time-critical banner for a person in custody, the computed deadlines, who and where with no account of events, and a fixed reply waiting for a person to approve",
+      label: "Sample criminal-defense case file",
+      caption: "The real screen, filled with fictional sample data: a person in custody is flagged time-critical by code, the case file holds no account of events, and the fixed reply waits for a person to approve.",
+    },
+    structureStep: "The raw message becomes a case file: who, where they are held, the court calendar, priority score.",
+    headline: ["A mother just called your firm at 3 AM", "about a son in county jail."],
+    lede: "Nobody answers a law office at 3:12 AM — and a person in custody can't wait until morning. Nightshift reads every after-hours message, flags what's time-critical, and never writes down what happened.",
+    checklist: CRIMINAL_CHECKLIST,
+    guarantees: CRIMINAL_GUARANTEES,
+    cards: CRIMINAL_CARDS,
+    faqs: CRIMINAL_FAQS,
+  },
 };
 
 const AREA_TABS: { area: PracticeArea; label: string; href: string }[] = [
   { area: "personal_injury", label: "Personal injury", href: "/" },
   { area: "immigration", label: "Immigration", href: "/?area=immigration" },
+  { area: "criminal_defense", label: "Criminal defense", href: "/?area=criminal" },
 ];
 
 function Section({

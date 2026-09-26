@@ -1,5 +1,5 @@
 // Real-time notification for high-priority leads (personal injury "sign_now";
-// immigration "sign_now" or time-critical). The AI can read a lead at
+// immigration and criminal defense "sign_now" or time-critical). The AI can read a lead at
 // 3 AM, but nothing about that helps unless a person finds out — this closes
 // that gap: the moment a lead routes "sign_now", every active user at the
 // firm gets an email immediately, and a reminder if it's still unapproved
@@ -11,7 +11,14 @@ import { and, eq, isNull } from "drizzle-orm";
 import { baseUrl, sendPlatformEmail } from "./email";
 import { getDb, tables } from "./db";
 import type { LeadRow } from "./db/schema";
-import { caseTypeLabelOf, contactOf, isImmigrationCaseFile, type AnyCaseFile } from "./casefile";
+import {
+  caseTypeLabelOf,
+  contactOf,
+  isCriminalCaseFile,
+  isImmigrationCaseFile,
+  isTimeCritical,
+  type AnyCaseFile,
+} from "./casefile";
 
 export const ESCALATION_DELAY_SECONDS = 30 * 60;
 
@@ -43,7 +50,7 @@ export async function notifyHighPriorityLead(
   const recipients = await firmRecipients(lead.firmId);
   if (recipients.length === 0) return;
   const name = contactOf(caseFile).name ?? "an unnamed lead";
-  const timeCritical = isImmigrationCaseFile(caseFile) && caseFile.timeCritical;
+  const timeCritical = isTimeCritical(caseFile);
   const subject = timeCritical
     ? `TIME-CRITICAL lead — ${name} (priority ${caseFile.priorityScore})`
     : `New Sign Now lead — ${name} (priority ${caseFile.priorityScore})`;
@@ -54,12 +61,13 @@ export async function notifyHighPriorityLead(
     "",
     // Coarse reasons only (never dates) — the exact deadlines stay behind the
     // attorney acknowledgment in Settings.
-    ...(isImmigrationCaseFile(caseFile) && caseFile.timeCriticalReasons.length > 0
+    ...((isImmigrationCaseFile(caseFile) || isCriminalCaseFile(caseFile)) &&
+    caseFile.timeCriticalReasons.length > 0
       ? [`Why: ${caseFile.timeCriticalReasons.join("; ")}`, ""]
       : []),
     `Priority ${caseFile.priorityScore}/100 — ${caseFile.scoreRationale}`,
     `Case type: ${caseTypeLabelOf(caseFile)}`,
-    !isImmigrationCaseFile(caseFile) && caseFile.injuryDescription
+    !isImmigrationCaseFile(caseFile) && !isCriminalCaseFile(caseFile) && caseFile.injuryDescription
       ? `Injury: ${caseFile.injuryDescription}`
       : null,
     caseFile.conflictFlags.length > 0 ? "Note: this lead is also conflict-held." : null,
@@ -80,7 +88,7 @@ export async function notifyEscalation(
   const recipients = await firmRecipients(lead.firmId);
   if (recipients.length === 0) return;
   const name = contactOf(caseFile).name ?? "an unnamed lead";
-  const timeCritical = isImmigrationCaseFile(caseFile) && caseFile.timeCritical;
+  const timeCritical = isTimeCritical(caseFile);
   const subject = timeCritical
     ? `Still waiting — TIME-CRITICAL lead at ${firmName}`
     : `Still waiting — Sign Now lead at ${firmName}`;

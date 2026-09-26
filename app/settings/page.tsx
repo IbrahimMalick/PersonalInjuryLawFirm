@@ -145,7 +145,9 @@ export default async function SettingsPage({
               <p className="text-sm text-dim leading-snug">
                 {firm.practiceArea === "immigration"
                   ? "Deadline countdowns (hearing dates, notice-response and appeal windows, filing bars) come from a reviewed table plus date math — never from the model. "
-                  : "Filing-deadline countdowns come from a reviewed table plus date math — never from the model. "}
+                  : firm.practiceArea === "criminal_defense"
+                    ? "Deadline countdowns (court dates, appeal windows, DUI license-hearing requests) come from a reviewed table plus date math — never from the model. Appeal and license-hearing windows vary widely by state and court. "
+                    : "Filing-deadline countdowns come from a reviewed table plus date math — never from the model. "}
                 The table ships as illustrative data:{" "}
                 <span className="text-inktext">
                   an attorney at your firm must review it against current law and acknowledge

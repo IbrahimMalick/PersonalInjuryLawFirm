@@ -182,9 +182,20 @@ export default async function Inbox({
 }) {
   if (isDemo()) redirect("/demo");
   if (!(await currentUser())) {
-    // The public landing page speaks to one practice area at a time (?area=immigration).
+    // The public landing page speaks to one practice area at a time
+    // (?area=immigration, ?area=criminal).
     const { area } = await searchParams;
-    return <Landing area={area === "immigration" ? "immigration" : "personal_injury"} />;
+    return (
+      <Landing
+        area={
+          area === "immigration"
+            ? "immigration"
+            : area === "criminal"
+              ? "criminal_defense"
+              : "personal_injury"
+        }
+      />
+    );
   }
   const { user, firm } = await requireFirmUser();
   const db = await getDb();

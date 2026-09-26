@@ -35,7 +35,7 @@ export type Routing = (typeof ROUTINGS)[number];
 // shape (lib/immigration-schema.ts for immigration). Personal injury is the
 // original shape and carries no discriminant in stored rows — anything without
 // a `practiceArea` is personal injury.
-export const PRACTICE_AREAS = ["personal_injury", "immigration"] as const;
+export const PRACTICE_AREAS = ["personal_injury", "immigration", "criminal_defense"] as const;
 export type PracticeArea = (typeof PRACTICE_AREAS)[number];
 
 const isoDate = z

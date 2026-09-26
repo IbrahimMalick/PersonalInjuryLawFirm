@@ -8,9 +8,19 @@
 //
 // Never throws: a GHL outage must not fail lead processing.
 
-import { caseTypeLabelOf, contactOf, isImmigrationCaseFile, type AnyCaseFile } from "../casefile";
 import {
+  caseTypeLabelOf,
+  contactOf,
+  isCriminalCaseFile,
+  isImmigrationCaseFile,
+  isTimeCritical,
+  type AnyCaseFile,
+} from "../casefile";
+import {
+  BAIL_STATUS_LABEL,
+  CASE_STAGE_LABEL,
   CURRENT_STATUS_LABEL,
+  WRITER_ROLE_LABEL,
   NOTICE_TYPE_LABEL,
   ROUTING_LABEL,
   TREATMENT_LABEL,
@@ -31,6 +41,12 @@ export interface LeadSyncInput {
   /** The triaged case file, or null when automatic triage failed. */
   caseFile: AnyCaseFile | null;
   processingError?: string | null;
+  /**
+   * Criminal defense: never copy the message text into the CRM. A person's own
+   * account of events can be used against them; the case file has none, so a
+   * failed-triage note must not carry the raw text either.
+   */
+  omitRaw?: boolean;
   /**
    * Whether an attorney at the firm has acknowledged the deadline table. Until
    * then the note carries no computed deadline (SOL or immigration) — the same
@@ -67,7 +83,7 @@ function tagsFor(input: LeadSyncInput): string[] {
   }
   tags.push(`Nightshift Case: ${caseTypeLabelOf(cf)}`);
   tags.push(`Nightshift Routing: ${ROUTING_LABEL[cf.routing]}`);
-  if (isImmigrationCaseFile(cf) && cf.timeCritical) tags.push("Nightshift: TIME-CRITICAL");
+  if (isTimeCritical(cf)) tags.push("Nightshift: TIME-CRITICAL");
   if (cf.conflictFlags.length > 0) tags.push("Nightshift: CONFLICT");
   if (cf.needsHumanReview) tags.push("Nightshift: Needs Review");
   return tags;
@@ -79,7 +95,8 @@ export function noteBody(input: LeadSyncInput): string {
 
   if (!cf) {
     L.push(`Automatic triage did not complete: ${input.processingError ?? "unknown error"}`);
-    L.push("", "As it arrived:", input.raw.slice(0, 2000));
+    if (input.omitRaw) L.push("", "The message is in Nightshift — open the lead to read it.");
+    else L.push("", "As it arrived:", input.raw.slice(0, 2000));
   } else if (isImmigrationCaseFile(cf)) {
     L.push(`Case type:   ${caseTypeLabelOf(cf)}`);
     L.push(`Priority:    ${cf.priorityScore}/100`);
@@ -105,6 +122,44 @@ export function noteBody(input: LeadSyncInput): string {
     if (cf.removal.isDetained === true) L.push("Detained:    yes (as reported)");
     // Computed deadlines only once an attorney has acknowledged the table —
     // the same gate as the review screen.
+    if (input.deadlinesVisible) {
+      for (const d of cf.deadlines) {
+        L.push(
+          d.kind === "computed"
+            ? `Deadline:    ${d.label} — ${d.deadlineISO} — ${d.daysRemaining} days left — ${d.basis}`
+            : `Deadline:    ${d.label} — ${d.basis}`
+        );
+      }
+    }
+    if (cf.missingInfo.length > 0) {
+      L.push("", "Intake still needs:");
+      cf.missingInfo.forEach((q) => L.push(`  - ${q}`));
+    }
+  } else if (isCriminalCaseFile(cf)) {
+    L.push(`Case type:   ${caseTypeLabelOf(cf)}`);
+    L.push(`Priority:    ${cf.priorityScore}/100`);
+    L.push(`Rationale:   ${cf.scoreRationale}`);
+    L.push(`Routing:     ${ROUTING_LABEL[cf.routing]}`);
+    L.push(`Confidence:  ${Math.round(cf.confidence * 100)}%`);
+    if (cf.timeCritical) L.push(`TIME-CRITICAL: ${cf.timeCriticalReasons.join("; ")}`);
+    if (cf.needsHumanReview) L.push("Flagged for human review.");
+    if (cf.conflictFlags.length > 0) L.push(`CONFLICT HOLD: ${cf.conflictFlags.join("; ")}`);
+    L.push("");
+    L.push(`Writer:      ${WRITER_ROLE_LABEL[cf.writerRole]}`);
+    if (cf.defendantName) L.push(`Person:      ${cf.defendantName}`);
+    if (cf.custody.inCustody === true) {
+      L.push(
+        `In custody:  yes (as reported)${cf.custody.heldAt ? ` — ${cf.custody.heldAt}` : ""} — ${BAIL_STATUS_LABEL[cf.custody.bailStatus]}`
+      );
+    }
+    if (cf.chargesStated.length > 0) L.push(`Charges:     ${cf.chargesStated.join(", ")}`);
+    if (cf.court.courtName || cf.court.jurisdiction) {
+      L.push(`Court:       ${[cf.court.courtName, cf.court.jurisdiction].filter(Boolean).join(" — ")}`);
+    }
+    L.push(`Stage:       ${CASE_STAGE_LABEL[cf.court.caseStage]}`);
+    if (cf.hasActiveWarrant === true) L.push("Warrant:     reported active");
+    // Computed deadlines and court dates only once an attorney has acknowledged
+    // the table — the same gate as the review screen.
     if (input.deadlinesVisible) {
       for (const d of cf.deadlines) {
         L.push(

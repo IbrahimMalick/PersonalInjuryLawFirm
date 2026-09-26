@@ -6,7 +6,7 @@ import type { LeadRow } from "./db/schema";
 import {
   contactOf,
   isHighPriority,
-  isImmigrationCaseFile,
+  isTimeCritical,
   type AnyCaseFile,
 } from "./casefile";
 import type { ExtractionInput } from "./extract";
@@ -40,9 +40,12 @@ function receivedLabel(iso: string, timezone: string): string {
 // explicit yes/no we can hand to code as a backstop for the model's reading.
 export const FORM_DETAINED_KEY = "Currently detained";
 
-function formDetainedAnswer(lead: LeadRow): boolean | undefined {
+// The public criminal-defense form's equivalent: "is the person in custody?"
+export const FORM_IN_CUSTODY_KEY = "In custody";
+
+function formAnswer(lead: LeadRow, key: string): boolean | undefined {
   const fields = (lead.meta as { formFields?: Record<string, string> } | null)?.formFields;
-  return fields?.[FORM_DETAINED_KEY] === "Yes" ? true : undefined;
+  return fields?.[key] === "Yes" ? true : undefined;
 }
 
 function toExtractionInput(lead: LeadRow, timezone: string): ExtractionInput {
@@ -91,7 +94,9 @@ export async function runProcessLead(leadId: string): Promise<void> {
     firm: { name: firm.name, practiceLine: firm.practiceLine },
     rawText: lead.raw,
     parties,
-    formDetained: formDetainedAnswer(lead),
+    formDetained: firm.practiceArea === "immigration" ? formAnswer(lead, FORM_DETAINED_KEY) : undefined,
+    formInCustody:
+      firm.practiceArea === "criminal_defense" ? formAnswer(lead, FORM_IN_CUSTODY_KEY) : undefined,
   });
   const { caseFile, draftReply } = result;
 
@@ -127,9 +132,10 @@ export async function runProcessLead(leadId: string): Promise<void> {
     await audit("conflict.flagged", { firmId: lead.firmId, leadId, detail: { match: flag } });
   }
 
-  // Immigration: a detained person or an imminent hearing is a liberty issue.
-  // Record which categories fired (coarse — never dates) for the audit trail.
-  if (isImmigrationCaseFile(caseFile) && caseFile.timeCritical) {
+  // Immigration and criminal defense: a detained person or an imminent hearing
+  // is a liberty issue. Record which categories fired (coarse — never dates)
+  // for the audit trail.
+  if (isTimeCritical(caseFile) && "timeCriticalReasons" in caseFile) {
     await audit("lead.time_critical", {
       firmId: lead.firmId,
       leadId,
@@ -159,6 +165,7 @@ export async function runProcessLead(leadId: string): Promise<void> {
     firmName: firm.name,
     caseFile,
     deadlinesVisible: Boolean(firm.solAcknowledgedAt),
+    omitRaw: firm.practiceArea === "criminal_defense",
   });
 }
 
@@ -189,13 +196,14 @@ export async function markLeadNeedsAttention(leadId: string, error: string): Pro
       firmName: firm?.name ?? "Unknown firm",
       caseFile: null,
       processingError: error,
+      omitRaw: firm?.practiceArea === "criminal_defense",
     });
   }
 }
 
 /**
  * Fires ESCALATION_DELAY_SECONDS after a high-priority lead ("sign_now", or an
- * immigration lead flagged time-critical) is triaged. A no-op if it's since
+ * immigration or criminal-defense lead flagged time-critical) is triaged. A no-op if it's since
  * been replied to, archived, or re-triaged away from high priority — so
  * re-running triage on the same lead can leave a stale reminder queued without
  * it saying anything wrong.

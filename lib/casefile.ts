@@ -1,21 +1,28 @@
+import type { CriminalCaseFile } from "./criminal-schema";
 import type { ImmigrationCaseFile } from "./immigration-schema";
-import { CASE_TYPE_LABEL, IMMIGRATION_CASE_TYPE_LABEL } from "./labels";
+import { CASE_TYPE_LABEL, CRIMINAL_CASE_TYPE_LABEL, IMMIGRATION_CASE_TYPE_LABEL } from "./labels";
 import type { CaseFile, PracticeArea } from "./schema";
 
-// A stored case file is one of two shapes, told apart by `practiceArea`. Every
+// A stored case file is one of three shapes, told apart by `practiceArea`. Every
 // case file written before practice areas existed has no such field and is
 // personal injury. Consumers that don't care which shape they have use these
-// helpers; consumers that do care narrow with isImmigrationCaseFile — never
+// helpers; consumers that do care narrow with isImmigrationCaseFile / isCriminalCaseFile — never
 // `any`.
 
-export type AnyCaseFile = CaseFile | ImmigrationCaseFile;
+export type AnyCaseFile = CaseFile | ImmigrationCaseFile | CriminalCaseFile;
 
 export function isImmigrationCaseFile(cf: AnyCaseFile): cf is ImmigrationCaseFile {
   return cf.practiceArea === "immigration";
 }
 
+export function isCriminalCaseFile(cf: AnyCaseFile): cf is CriminalCaseFile {
+  return cf.practiceArea === "criminal_defense";
+}
+
 export function practiceAreaOf(cf: AnyCaseFile): PracticeArea {
-  return isImmigrationCaseFile(cf) ? "immigration" : "personal_injury";
+  if (isImmigrationCaseFile(cf)) return "immigration";
+  if (isCriminalCaseFile(cf)) return "criminal_defense";
+  return "personal_injury";
 }
 
 export interface CaseContact {
@@ -25,9 +32,13 @@ export interface CaseContact {
   preferredLanguage: string | null;
 }
 
-/** The person who wrote in — `claimant` for personal injury, `applicant` for immigration. */
+/** The person who wrote in — `claimant` (PI), `applicant` (immigration), `contact` (criminal defense). */
 export function contactOf(cf: AnyCaseFile): CaseContact {
-  const c = isImmigrationCaseFile(cf) ? cf.applicant : cf.claimant;
+  const c = isImmigrationCaseFile(cf)
+    ? cf.applicant
+    : isCriminalCaseFile(cf)
+      ? cf.contact
+      : cf.claimant;
   return {
     name: c.name,
     phone: c.phone,
@@ -37,9 +48,9 @@ export function contactOf(cf: AnyCaseFile): CaseContact {
 }
 
 export function caseTypeLabelOf(cf: AnyCaseFile): string {
-  return isImmigrationCaseFile(cf)
-    ? IMMIGRATION_CASE_TYPE_LABEL[cf.caseType]
-    : CASE_TYPE_LABEL[cf.caseType];
+  if (isImmigrationCaseFile(cf)) return IMMIGRATION_CASE_TYPE_LABEL[cf.caseType];
+  if (isCriminalCaseFile(cf)) return CRIMINAL_CASE_TYPE_LABEL[cf.caseType];
+  return CASE_TYPE_LABEL[cf.caseType];
 }
 
 /** Longest status detail that reads as a label ("F-1", "expired visitor visa") rather than prose. */
@@ -66,12 +77,12 @@ export function guidanceSentence(cf: AnyCaseFile, routingSentence: string): stri
 }
 
 export function isTimeCritical(cf: AnyCaseFile | null | undefined): boolean {
-  return Boolean(cf && isImmigrationCaseFile(cf) && cf.timeCritical);
+  return Boolean(cf && (isImmigrationCaseFile(cf) || isCriminalCaseFile(cf)) && cf.timeCritical);
 }
 
 /**
  * Does this lead warrant the immediate alert and the 30-minute escalation?
- * Personal injury: routed "sign_now" (unchanged). Immigration: also any
+ * Personal injury: routed "sign_now" (unchanged). Immigration and criminal defense: also any
  * time-critical lead, whatever its routing.
  */
 export function isHighPriority(cf: AnyCaseFile): boolean {

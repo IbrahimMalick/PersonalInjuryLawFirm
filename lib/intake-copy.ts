@@ -83,8 +83,22 @@ export interface ImmigrationExtras {
   identifierWarning: string;
 }
 
+export interface CriminalExtras {
+  /** Shown above the message box — the one thing this form asks NOT to do. */
+  narrativeWarning: string;
+  inCustodyLabel: string;
+  inCustodyYes: string;
+  inCustodyNo: string;
+  inCustodyUnsure: string;
+  courtDateLabel: string;
+  courtDateHint: string;
+  courtLabel: string;
+  courtHint: string;
+}
+
 export interface AreaIntakeCopy extends IntakeCopy {
   immigration?: ImmigrationExtras;
+  criminal?: CriminalExtras;
 }
 
 export const IMMIGRATION_INTAKE_COPY: Record<IntakeLang, AreaIntakeCopy> = {
@@ -148,7 +162,77 @@ export const IMMIGRATION_INTAKE_COPY: Record<IntakeLang, AreaIntakeCopy> = {
   },
 };
 
+// ── Criminal defense ─────────────────────────────────────────────────────────
+// The form asks for who, where, and the court calendar — and asks the visitor
+// NOT to describe what happened. Anything written before a lawyer is engaged can
+// be used against the person, and the form is not a privileged channel.
+
+export const CRIMINAL_INTAKE_COPY: Record<IntakeLang, AreaIntakeCopy> = {
+  en: {
+    intro:
+      "Tell us who needs help and where they are now. If you are writing for a family member or friend, that is fine. We can start with whatever you know — a name, a jail, a court date.",
+    firstName: "Your first name",
+    lastName: "Your last name",
+    phone: "Best phone number",
+    email: "Email",
+    whatHappened: "Who was arrested or charged, and where are they now?",
+    attachmentsLabel: "Court papers (optional)",
+    attachmentsHint: "A court notice or a release paper — up to 5 files, 8MB each.",
+    submit: "Send to our intake team",
+    disclaimer:
+      "Submitting this form does not create an attorney-client relationship, and nothing here is legal advice. We have not agreed to represent you. This form is not a private, privileged conversation. A member of our team reviews every inquiry personally. If someone is in immediate danger, call 911.",
+    confirmTitle: "We got your message",
+    confirmBody:
+      "A member of our team personally reviews every inquiry — day or night. Please keep your phone nearby, and do not describe what happened in a text, email, or voicemail. Your attorney will speak with you directly.",
+    emergency: "If someone is in immediate danger, call 911.",
+    criminal: {
+      narrativeWarning:
+        "Please do not describe what happened. Anything you write here can be used against you. Just tell us who and where — your attorney will talk with you directly and in confidence.",
+      inCustodyLabel: "Is the person currently in custody?",
+      inCustodyYes: "Yes",
+      inCustodyNo: "No",
+      inCustodyUnsure: "Not sure",
+      courtDateLabel: "Next court date (optional)",
+      courtDateHint: "If you know it — it helps us reach you in time.",
+      courtLabel: "County or court (optional)",
+      courtHint: "For example: Harris County, or the name of the court.",
+    },
+  },
+  es: {
+    intro:
+      "Cuéntenos quién necesita ayuda y dónde está ahora. Si escribe por un familiar o amigo, no hay problema. Podemos comenzar con lo que sepa — un nombre, una cárcel, una fecha de corte.",
+    firstName: "Su nombre",
+    lastName: "Su apellido",
+    phone: "Mejor número de teléfono",
+    email: "Correo electrónico",
+    whatHappened: "¿Quién fue arrestado o acusado, y dónde está ahora?",
+    attachmentsLabel: "Documentos de la corte (opcional)",
+    attachmentsHint: "Un aviso de la corte o un papel de liberación — hasta 5 archivos, 8MB cada uno.",
+    submit: "Enviar a nuestro equipo de admisión",
+    disclaimer:
+      "Enviar este formulario no crea una relación abogado-cliente, y nada aquí es asesoría legal. No hemos aceptado representarle. Este formulario no es una conversación privada ni confidencial. Un miembro de nuestro equipo revisa personalmente cada consulta. Si alguien está en peligro inmediato, llame al 911.",
+    confirmTitle: "Recibimos su mensaje",
+    confirmBody:
+      "Un miembro de nuestro equipo revisa personalmente cada consulta — de día o de noche. Por favor mantenga su teléfono cerca y no describa lo sucedido por mensaje de texto, correo electrónico ni mensaje de voz. Su abogado hablará directamente con usted.",
+    emergency: "Si alguien está en peligro inmediato, llame al 911.",
+    criminal: {
+      narrativeWarning:
+        "Por favor no describa lo sucedido. Todo lo que escriba aquí puede usarse en su contra. Solo díganos quién y dónde — su abogado hablará con usted directamente y en confidencia.",
+      inCustodyLabel: "¿La persona está detenida actualmente?",
+      inCustodyYes: "Sí",
+      inCustodyNo: "No",
+      inCustodyUnsure: "No estoy seguro/a",
+      courtDateLabel: "Próxima fecha de corte (opcional)",
+      courtDateHint: "Si la conoce — nos ayuda a comunicarnos a tiempo.",
+      courtLabel: "Condado o corte (opcional)",
+      courtHint: "Por ejemplo: Condado de Harris, o el nombre de la corte.",
+    },
+  },
+};
+
 /** The form copy for a firm's practice area. Personal injury is the original copy, untouched. */
 export function intakeCopyFor(area: PracticeArea, lang: IntakeLang): AreaIntakeCopy {
-  return area === "immigration" ? IMMIGRATION_INTAKE_COPY[lang] : INTAKE_COPY[lang];
+  if (area === "immigration") return IMMIGRATION_INTAKE_COPY[lang];
+  if (area === "criminal_defense") return CRIMINAL_INTAKE_COPY[lang];
+  return INTAKE_COPY[lang];
 }

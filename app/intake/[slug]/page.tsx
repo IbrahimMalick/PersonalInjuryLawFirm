@@ -28,6 +28,7 @@ export default async function IntakeForm({
   const lang = intakeLang(langParam);
   const t = intakeCopyFor(firm.practiceArea, lang);
   const imm = t.immigration;
+  const crim = t.criminal;
 
   const input =
     "w-full rounded-sm border border-papertext/25 bg-white px-3 py-2.5 text-[16px] text-papertext focus:outline focus:outline-2 focus:outline-carbon";
@@ -103,10 +104,49 @@ export default async function IntakeForm({
                 <input name="email" type="email" className={input} autoComplete="email" />
               </label>
             </div>
+            {crim && (
+              <p
+                className="rounded-sm border-2 border-stamp/60 bg-stamp/10 px-3 py-2 text-[14px] leading-snug"
+                role="note"
+              >
+                {crim.narrativeWarning}
+              </p>
+            )}
             <label className="block">
               <span className="field-label text-paperdim">{t.whatHappened}</span>
-              <textarea name="message" rows={6} className={input} />
+              <textarea name="message" rows={crim ? 4 : 6} className={input} />
             </label>
+            {crim && (
+              <>
+                <fieldset className="block">
+                  <legend className="field-label text-paperdim">{crim.inCustodyLabel}</legend>
+                  <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-[16px]">
+                    {(
+                      [
+                        ["yes", crim.inCustodyYes],
+                        ["no", crim.inCustodyNo],
+                        ["unsure", crim.inCustodyUnsure],
+                      ] as const
+                    ).map(([value, label]) => (
+                      <label key={value} className="flex items-center gap-2">
+                        <input type="radio" name="inCustody" value={value} />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                <label className="block">
+                  <span className="field-label text-paperdim">{crim.courtDateLabel}</span>
+                  <input name="courtDate" type="date" className={input} />
+                  <span className="block text-[13px] text-paperdim mt-1">{crim.courtDateHint}</span>
+                </label>
+                <label className="block">
+                  <span className="field-label text-paperdim">{crim.courtLabel}</span>
+                  <input name="court" className={input} />
+                  <span className="block text-[13px] text-paperdim mt-1">{crim.courtHint}</span>
+                </label>
+              </>
+            )}
             {imm && (
               <>
                 <p className="text-[13px] leading-snug text-paperdim">{imm.identifierWarning}</p>
