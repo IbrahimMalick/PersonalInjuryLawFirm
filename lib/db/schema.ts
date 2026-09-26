@@ -26,7 +26,7 @@ export const firms = pgTable(
     // personal injury. Drives the case-file shape, prompt, guardrails and
     // deadline table (lib/practice-areas.ts). practiceLine below stays the
     // free-text display label.
-    practiceArea: text("practice_area", { enum: ["personal_injury", "immigration"] })
+    practiceArea: text("practice_area", { enum: ["personal_injury", "immigration", "criminal_defense"] })
       .notNull()
       .default("personal_injury"),
     practiceLine: text("practice_line").notNull().default("Injury Law"),

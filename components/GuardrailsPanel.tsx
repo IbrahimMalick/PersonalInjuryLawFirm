@@ -2,6 +2,8 @@
 
 import {
   conductRules,
+  CRIMINAL_REVIEW_RULES,
+  criminalReplyFor,
   disclaimerFor,
   IMMIGRATION_REVIEW_RULES,
   REVIEW_RULES,
@@ -51,6 +53,25 @@ const IMMIGRATION_NEVER = [
   },
 ];
 
+const CRIMINAL_NEVER = [
+  {
+    title: "No legal advice",
+    body: "The engine routes inquiries. It never applies criminal law to a person's facts, never predicts an outcome, a sentence, or a plea, and never advises anyone what to do.",
+  },
+  {
+    title: "No talk of the facts",
+    body: "It never records, repeats, or asks about what happened, and never asks whether the person did it. Anything written before a lawyer is engaged can be used against them.",
+  },
+  {
+    title: "No advice on rights",
+    body: "It never advises anyone whether to talk to police, waive a right, consent to a search, post bail, take a plea, or attend a court date.",
+  },
+  {
+    title: "Every reply is fixed text",
+    body: "The model writes no reply at all. Code sends reviewed wording that also asks the sender not to describe what happened. A person approves it — the Send button is a human's finger, not a webhook.",
+  },
+];
+
 export default function GuardrailsPanel({
   firmName,
   practiceArea = "personal_injury",
@@ -62,7 +83,8 @@ export default function GuardrailsPanel({
   variant?: "demo" | "product";
 }) {
   const immigration = practiceArea === "immigration";
-  const never = immigration ? IMMIGRATION_NEVER : NEVER;
+  const criminal = practiceArea === "criminal_defense";
+  const never = criminal ? CRIMINAL_NEVER : immigration ? IMMIGRATION_NEVER : NEVER;
   return (
     <div className="px-6 pt-6 pb-12 max-w-[1280px] mx-auto">
       <header className="max-w-2xl">
@@ -110,6 +132,29 @@ export default function GuardrailsPanel({
             </div>
           </section>
 
+          {criminal && (
+            <section>
+              <div className="field-label text-dim pb-2">
+                The reply itself — written by code for every lead, never by the model
+              </div>
+              <div className="rounded-sm bg-paper text-papertext p-4 text-[14px] leading-snug space-y-3">
+                <p>{criminalReplyFor("en", firmName, false)}</p>
+                <p className="border-t border-papertext/15 pt-3">
+                  {criminalReplyFor("es", firmName, false)}
+                </p>
+              </div>
+              <div className="field-label text-dim pt-3 pb-2">
+                When someone may be in custody or a court date is close
+              </div>
+              <div className="rounded-sm bg-paper text-papertext p-4 text-[14px] leading-snug space-y-3">
+                <p>{criminalReplyFor("en", firmName, true)}</p>
+                <p className="border-t border-papertext/15 pt-3">
+                  {criminalReplyFor("es", firmName, true)}
+                </p>
+              </div>
+            </section>
+          )}
+
           {immigration && (
             <section>
               <div className="field-label text-dim pb-2">
@@ -139,6 +184,14 @@ export default function GuardrailsPanel({
                 <span className="text-manila font-mono">▸</span> The routing is &ldquo;sign
                 now&rdquo; — the best cases get the most scrutiny, not the least
               </li>
+              {criminal && CRIMINAL_REVIEW_RULES.forcedOnTimeCritical && (
+                <li className="flex gap-2.5">
+                  <span className="text-stamp font-mono">▸</span> The lead is time-critical —
+                  someone may be in custody, there is an active warrant, or a court date or
+                  deadline is within {CRIMINAL_REVIEW_RULES.timeCriticalWindowDays} days. It is
+                  never routed to decline or follow-up, and the team is alerted at once.
+                </li>
+              )}
               {immigration && IMMIGRATION_REVIEW_RULES.forcedOnTimeCritical && (
                 <li className="flex gap-2.5">
                   <span className="text-stamp font-mono">▸</span> The lead is time-critical — a
@@ -172,6 +225,14 @@ export default function GuardrailsPanel({
                     processed lead is copied there — with no computed deadline until your
                     attorney has acknowledged the deadline table.
                   </p>
+                  {criminal && (
+                    <p>
+                      <span className="text-manila font-mono">▸</span> The case file holds only
+                      who, where, and the court calendar — it has no field for what allegedly
+                      happened. The message itself is stored as it was received, and is never
+                      copied into the CRM.
+                    </p>
+                  )}
                 </>
               ) : (
                 <>
@@ -191,7 +252,11 @@ export default function GuardrailsPanel({
                 <span className="text-manila font-mono">▸</span> Filing deadlines come from a
                 reviewed table in{" "}
                 <span className="font-mono text-sm">
-                  {immigration ? "lib/immigration-deadlines.ts" : "lib/sol-table.ts"}
+                  {criminal
+                    ? "lib/criminal-deadlines.ts"
+                    : immigration
+                      ? "lib/immigration-deadlines.ts"
+                      : "lib/sol-table.ts"}
                 </span>{" "}
                 plus date arithmetic. A model that hallucinates a deadline is a malpractice
                 generator, so the model is never asked for one.

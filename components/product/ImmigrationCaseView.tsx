@@ -16,14 +16,18 @@ function yesNo(v: boolean | "unknown"): string {
   return v === "unknown" ? "unknown" : v ? "yes" : "no";
 }
 
-export function TimeCriticalBanner({ cf }: { cf: ImmigrationCaseFile }) {
+export function TimeCriticalBanner({
+  cf,
+  note = "Do not queue this for morning. A person may be detained or something is due very soon.",
+}: {
+  cf: { timeCritical: boolean; timeCriticalReasons: string[] };
+  note?: string;
+}) {
   if (!cf.timeCritical) return null;
   return (
     <div className="rounded-sm border-2 border-stamp bg-stamp/15 px-5 py-3" role="alert">
       <div className="field-label text-stamp pb-1">⚠ Time-critical — call now</div>
-      <p className="text-[15px] text-inktext">
-        Do not queue this for morning. A person may be detained or something is due very soon.
-      </p>
+      <p className="text-[15px] text-inktext">{note}</p>
       <ul className="mt-1.5 space-y-0.5">
         {cf.timeCriticalReasons.map((r) => (
           <li key={r} className="text-stamp font-semibold text-[15px]">

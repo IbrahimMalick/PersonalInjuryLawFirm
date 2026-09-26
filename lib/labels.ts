@@ -1,4 +1,11 @@
 import type {
+  BailStatus,
+  CaseStage,
+  CriminalCaseType,
+  HearingType,
+  WriterRole,
+} from "./criminal-schema";
+import type {
   CurrentStatus,
   ImmigrationCaseType,
   NoticeType,
@@ -21,6 +28,7 @@ export const CASE_TYPE_LABEL: Record<CaseType, string> = {
 export const PRACTICE_AREA_LABEL: Record<PracticeArea, string> = {
   personal_injury: "Personal injury",
   immigration: "Immigration",
+  criminal_defense: "Criminal defense",
 };
 
 // What a firm's `practiceLine` (the free-text display label) defaults to when
@@ -28,6 +36,7 @@ export const PRACTICE_AREA_LABEL: Record<PracticeArea, string> = {
 export const DEFAULT_PRACTICE_LINE: Record<PracticeArea, string> = {
   personal_injury: "Injury Law",
   immigration: "Immigration Law",
+  criminal_defense: "Criminal Defense",
 };
 
 export const IMMIGRATION_CASE_TYPE_LABEL: Record<ImmigrationCaseType, string> = {
@@ -40,6 +49,55 @@ export const IMMIGRATION_CASE_TYPE_LABEL: Record<ImmigrationCaseType, string> = 
   daca_tps: "DACA / TPS",
   other: "Other immigration",
   not_a_case: "Not a case",
+};
+
+export const CRIMINAL_CASE_TYPE_LABEL: Record<CriminalCaseType, string> = {
+  dui_dwi: "DUI / DWI",
+  drug: "Drug",
+  assault_violence: "Assault / violence",
+  domestic_violence: "Domestic violence",
+  theft_property: "Theft / property",
+  weapons: "Weapons",
+  traffic: "Traffic",
+  probation_violation: "Probation violation",
+  juvenile: "Juvenile",
+  white_collar: "White collar",
+  other: "Other criminal",
+  not_a_case: "Not a case",
+};
+
+export const WRITER_ROLE_LABEL: Record<WriterRole, string> = {
+  defendant: "The person charged",
+  family_or_friend: "Family or friend",
+  unknown: "Relationship unclear",
+};
+
+export const BAIL_STATUS_LABEL: Record<BailStatus, string> = {
+  not_set: "Bail not set",
+  set: "Bail set",
+  posted: "Bail posted",
+  denied: "Bail denied",
+  unknown: "Bail unknown",
+};
+
+export const HEARING_TYPE_LABEL: Record<HearingType, string> = {
+  arraignment: "Arraignment",
+  bail: "Bail hearing",
+  preliminary: "Preliminary hearing",
+  trial: "Trial",
+  sentencing: "Sentencing",
+  probation_violation: "Probation-violation hearing",
+  other: "Court date",
+  unknown: "Court date",
+};
+
+export const CASE_STAGE_LABEL: Record<CaseStage, string> = {
+  pre_charge: "Before charges",
+  charged: "Charged",
+  pending: "Case pending",
+  post_conviction: "After conviction",
+  probation: "On probation",
+  unknown: "Stage unknown",
 };
 
 export const CURRENT_STATUS_LABEL: Record<CurrentStatus, string> = {

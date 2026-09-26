@@ -3,6 +3,7 @@ import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 import AppShell from "@/components/product/AppShell";
+import CriminalCaseView from "@/components/product/CriminalCaseView";
 import ImmigrationCaseView, { TimeCriticalBanner } from "@/components/product/ImmigrationCaseView";
 import ReviewPanel from "@/components/product/ReviewPanel";
 import { audit } from "@/lib/audit";
@@ -11,6 +12,7 @@ import {
   caseTypeLabelOf,
   contactOf,
   guidanceSentence,
+  isCriminalCaseFile,
   isImmigrationCaseFile,
   practiceAreaOf,
   type AnyCaseFile,
@@ -100,9 +102,10 @@ export default async function LeadReview({ params }: { params: Promise<{ id: str
     .orderBy(asc(tables.auditEvents.id));
 
   const cf = (lead.caseFile as unknown as AnyCaseFile | null) ?? null;
-  // Two case-file shapes (personal injury, immigration) — narrow once, here.
-  const pi = cf && !isImmigrationCaseFile(cf) ? cf : null;
+  // Three case-file shapes (personal injury, immigration, criminal defense) — narrow once, here.
+  const pi = cf && !isImmigrationCaseFile(cf) && !isCriminalCaseFile(cf) ? cf : null;
   const imm = cf && isImmigrationCaseFile(cf) ? cf : null;
+  const crim = cf && isCriminalCaseFile(cf) ? cf : null;
   const sol = pi?.statuteOfLimitations;
   const solUrgent = sol?.daysRemaining != null && sol.daysRemaining < 180;
   const conflict = (cf?.conflictFlags.length ?? 0) > 0;
@@ -190,6 +193,7 @@ export default async function LeadReview({ params }: { params: Promise<{ id: str
                       {imm?.applicant.countryOfCitizenship
                         ? ` · ${imm.applicant.countryOfCitizenship}`
                         : ""}
+                      {crim?.court.jurisdiction ? ` · ${crim.court.jurisdiction}` : ""}
                     </div>
                   </div>
                   <span
@@ -213,6 +217,12 @@ export default async function LeadReview({ params }: { params: Promise<{ id: str
             )}
 
             {imm && <TimeCriticalBanner cf={imm} />}
+            {crim && (
+              <TimeCriticalBanner
+                cf={crim}
+                note="Do not queue this for morning. Someone may be in custody, or a court date or deadline is very close."
+              />
+            )}
 
             {conflict && cf && (
               <div className="rounded-sm border-2 border-stamp bg-stamp/10 px-5 py-3">
@@ -230,6 +240,7 @@ export default async function LeadReview({ params }: { params: Promise<{ id: str
             )}
 
             {imm && <ImmigrationCaseView cf={imm} deadlinesVisible={solAcknowledged} />}
+            {crim && <CriminalCaseView cf={crim} deadlinesVisible={solAcknowledged} />}
 
             {pi && (
               <div className="grid grid-cols-2 gap-3">
