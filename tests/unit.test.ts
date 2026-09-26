@@ -30,6 +30,7 @@ import {
   buildImmigrationCaseFile,
   immigrationExtractor,
   parseImmigrationDefensively,
+  stripStatedDeadlines,
 } from "../lib/immigration";
 import type { ImmigrationModelOutput } from "../lib/immigration-schema";
 import { leadUrgency } from "../lib/urgency";
@@ -634,5 +635,54 @@ describe("staff-facing text (immigration)", () => {
     expect(guidanceSentence(build(immOutput).caseFile, line)).toBe(line);
     // personal injury is untouched
     expect(guidanceSentence(buildCaseFile(validOutput, "", []).caseFile, line)).toBe(line);
+  });
+});
+
+describe("the model can't state a deadline in free text", () => {
+  it("keeps facts and 'unknown' statements", () => {
+    const kept = [
+      "Sender received an RFE dated September 15, 2026 for a family-based petition.",
+      "Detention and an active RFE with an unknown response deadline make this time-sensitive.",
+      "Hearing scheduled for October 6.",
+      "Recibió una carta de inmigración el 15 de septiembre.",
+    ];
+    for (const t of kept) expect(stripStatedDeadlines(t)).toBe(t);
+  });
+  it("removes a clause that states a deadline, due date, or day count", () => {
+    for (const t of [
+      "The response is due December 8, 2026.",
+      "You have 84 days to respond.",
+      "Must file within 30 days of the decision.",
+      "Status expires 2026-12-01.",
+      "El plazo vence el 8 de diciembre.",
+      "Tiene 30 días para responder.",
+    ]) {
+      expect(stripStatedDeadlines(t)).toBe("");
+    }
+  });
+  it("removes only the offending clause, keeping the rest", () => {
+    expect(
+      stripStatedDeadlines("Sender reports an RFE dated September 15; response due by December 8. Wants a call.")
+    ).toBe("Sender reports an RFE dated September 15; Wants a call.");
+  });
+  it("is applied to the rationale and call-script questions in the case file", () => {
+    const { caseFile } = build({
+      ...immOutput,
+      scoreRationale: "Wants an update. Response due December 8, 2026.",
+      missingInfo: ["Best time to call", "Do they know the deadline of 84 days?"],
+    });
+    expect(caseFile.scoreRationale).toBe("Wants an update.");
+    expect(caseFile.missingInfo).toEqual(["Best time to call"]);
+  });
+  it("never leaves the rationale empty", () => {
+    const { caseFile } = build({ ...immOutput, scoreRationale: "Response due December 8, 2026." });
+    expect(caseFile.scoreRationale).toBe("See the message below.");
+  });
+  it("tells the model about deadlines and about what the detained form question means", () => {
+    const system = immigrationExtractor({} as never, FIRM).system("2026-09-26").replace(/\s+/g, " ");
+    expect(system).toMatch(/NO DEADLINES ANYWHERE/);
+    expect(system).toMatch(/including scoreRationale and missingInfo/);
+    expect(system).toMatch(/means SOMEONE is detained — not necessarily the sender/);
+    expect(system).toMatch(/Never write that the sender themself is detained unless they say so/);
   });
 });
