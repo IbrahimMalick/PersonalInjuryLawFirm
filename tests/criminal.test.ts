@@ -10,6 +10,7 @@ import {
 import { noteBody } from "../lib/channels/ghl-sync";
 import {
   buildCriminalCaseFile,
+  chargesSaidBySender,
   criminalConflictNames,
   criminalExtractor,
   parseCriminalDefensively,
@@ -65,7 +66,7 @@ const output: CriminalModelOutput = {
 };
 
 const build = (over: Partial<CriminalModelOutput> = {}, parties: { name: string; relationship: string }[] = []) =>
-  buildCriminalCaseFile({ ...output, ...over }, "raw text", parties, { firmName: FIRM, now: NOW });
+  buildCriminalCaseFile({ ...output, ...over }, "My son has a possession charge", parties, { firmName: FIRM, now: NOW });
 
 const triggers = (over: Partial<CriminalTriggers> = {}): CriminalTriggers => ({
   caseType: "drug",
@@ -255,6 +256,38 @@ describe("buildCriminalCaseFile trust boundary", () => {
   it("caps a run-on rationale", () => {
     const { caseFile } = build({ scoreRationale: "x".repeat(500) });
     expect(caseFile.scoreRationale.length).toBeLessThanOrEqual(200);
+  });
+});
+
+describe("charges are only what the sender wrote", () => {
+  const story = "My husband got arrested. He got into a fight outside a bar and hit the other guy, then drove home drunk. He is at the city jail.";
+  it("drops charges the model worked out from described conduct, and the case type that came with them", () => {
+    const { caseFile } = buildCriminalCaseFile(
+      { ...output, caseType: "assault_violence", chargesStated: ["assault", "DUI"] },
+      story,
+      [],
+      { firmName: FIRM, now: NOW }
+    );
+    expect(caseFile.chargesStated).toEqual([]);
+    expect(caseFile.caseType).toBe("other");
+  });
+  it("keeps a charge the sender named, matching word forms and case", () => {
+    expect(chargesSaidBySender(["DUI"], "I got a DUI stop")).toEqual(["DUI"]);
+    expect(chargesSaidBySender(["assault"], "charged with Assaulting an officer")).toEqual(["assault"]);
+    expect(chargesSaidBySender(["Possession of a controlled substance"], "a possession charge")).toEqual([
+      "Possession of a controlled substance",
+    ]);
+  });
+  it("keeps only the named ones when the model mixes named and inferred charges", () => {
+    expect(chargesSaidBySender(["DUI", "assault"], "He got a DUI and hit a guy")).toEqual(["DUI"]);
+  });
+  it("leaves the case type alone when the model listed no charges at all", () => {
+    const { caseFile } = buildCriminalCaseFile({ ...output, caseType: "drug", chargesStated: [] }, "help", [], { firmName: FIRM, now: NOW });
+    expect(caseFile.caseType).toBe("drug");
+  });
+  it("tells the model never to work a charge out of conduct", () => {
+    const system = criminalExtractor({ receivedLabel: "x" } as never, FIRM).system("2026-09-26").replace(/\s+/g, " ");
+    expect(system).toContain("NEVER work out a charge from described conduct");
   });
 });
 
