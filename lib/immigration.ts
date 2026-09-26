@@ -53,8 +53,14 @@ commentary. Schema (all fields required; use null where unknown):
 Field notes:
 - applicant.phone: normalize spoken or spelled-out numbers to (XXX) XXX-XXXX.
 - applicant.preferredLanguage: language code inferred from the message ("en", "es", ...).
-- currentStatus and currentStatusDetail: record only what the sender says. Do
-  NOT decide anyone's legal status. If they don't say, use "unknown".
+- LANGUAGE: the people who read this case file work in English. Write
+  scoreRationale, missingInfo, and currentStatusDetail in ENGLISH even when the
+  message is in another language. Only draftReply follows the sender's language.
+- currentStatus: record only what the sender says. Do NOT decide anyone's legal
+  status. If they don't say, use "unknown".
+- currentStatusDetail: a SHORT label only — a visa or status type such as "F-1",
+  "H-1B", or "expired visitor visa" (40 characters at most) — or null. Never a
+  sentence, never a summary of the message; put narrative nowhere in this field.
 - Dates: extract ONLY dates the sender actually states or that are printed on a
   notice they describe. Do NOT compute a deadline, and do NOT infer a date.
   Use null when a date is not stated.
