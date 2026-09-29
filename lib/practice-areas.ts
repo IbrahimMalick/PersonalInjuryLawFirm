@@ -2,6 +2,7 @@ import type { AnyCaseFile } from "./casefile";
 import type { ConflictParty } from "./conflicts";
 import { buildCaseFile, extractModelOutput, extractWithArea, type ExtractionInput } from "./extract";
 import { buildCriminalCaseFile, criminalExtractor } from "./criminal";
+import { buildFamilyCaseFile, familyExtractor } from "./family";
 import { buildImmigrationCaseFile, immigrationExtractor } from "./immigration";
 import type { PracticeArea } from "./schema";
 
@@ -21,6 +22,8 @@ export interface LeadForArea {
   formDetained?: boolean;
   /** Criminal defense only: the public form's explicit "in custody" answer. */
   formInCustody?: boolean;
+  /** Family law only: the public form's explicit "safety concern" answer. */
+  formSafetyConcern?: boolean;
   now?: Date;
 }
 
@@ -75,10 +78,25 @@ const criminalDefense: AreaProcessor = async (lead) => {
   return { ...built, via: result.via, retried: result.retried, retryReason: result.retryReason };
 };
 
+const familyLaw: AreaProcessor = async (lead) => {
+  const result = await extractWithArea(
+    lead.input,
+    familyExtractor(lead.input, modelFirmName(lead.firm)),
+    { allowFallback: false }
+  );
+  const built = buildFamilyCaseFile(result.output, lead.rawText, lead.parties, {
+    firmName: lead.firm.name,
+    now: lead.now,
+    formSafetyConcern: lead.formSafetyConcern,
+  });
+  return { ...built, via: result.via, retried: result.retried, retryReason: result.retryReason };
+};
+
 const AREAS: Record<PracticeArea, AreaProcessor> = {
   personal_injury: personalInjury,
   immigration,
   criminal_defense: criminalDefense,
+  family_law: familyLaw,
 };
 
 export function processLeadForArea(area: PracticeArea, lead: LeadForArea): Promise<AreaOutcome> {

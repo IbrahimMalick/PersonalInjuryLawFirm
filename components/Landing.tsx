@@ -268,6 +268,72 @@ const CRIMINAL_FAQS = [
   },
 ];
 
+// ── Family law copy ──────────────────────────────────────────────────────────
+// Claims about what the product actually does for a family-law firm — no
+// invented stats, no testimonials. The distinctive claim: there is no rule
+// table for family-law deadlines because they vary too much by state and
+// county to publish safely, so only dates the sender was actually told are
+// shown, plainly labelled as stated facts.
+
+const FAMILY_CHECKLIST = [
+  "Reads voicemail, text, WhatsApp, email, and your web form — including Spanish",
+  "Builds a case file: the other party, any children involved, the court calendar",
+  "Flags a reported safety concern, or a hearing this week, for immediate attention",
+  "Drafts the reply — a human approves every send",
+];
+
+const FAMILY_GUARANTEES = [
+  { mark: "☑", text: "Nothing sends without a human clicking approve" },
+  { mark: "⏱", text: "Only dates the sender says they were actually told — never a guessed window" },
+  { mark: "⛔", text: "No legal advice, no predictions about custody, support, or a divorce outcome" },
+  { mark: "▤", text: "Every action lands in an append-only audit trail" },
+];
+
+const FAMILY_CARDS = [
+  {
+    n: "01",
+    title: "Reads the mess",
+    body: "A message about a divorce, a custody dispute, or a safety concern — each becomes a structured case file: who the other party is, whether children are involved, the court and any date the sender was told, and the exact questions intake still needs to ask. A reported safety concern is recorded as a flag, never a description.",
+  },
+  {
+    n: "02",
+    title: "Knows what it must never do",
+    body: "No legal advice. No predictions about who gets custody, how much support, or how a divorce will go. No advice on filing, responding, or violating a court order. There is no deadline table — family-law windows vary too widely by state and county to publish safely — so only a date the sender was actually told is shown, exactly as stated.",
+  },
+  {
+    n: "03",
+    title: "Your finger on Send",
+    body: "Every reply waits on your review screen, editable, with edits logged. A reported safety concern, or a hearing within a week, is flagged time-critical by code, alerts your team at once, and gets a brief acknowledgment draft — still sent only when a person approves it.",
+  },
+];
+
+const FAMILY_FAQS = [
+  {
+    q: "Does Nightshift give legal advice?",
+    a: "No — by construction, not by promise. The system prompt forbids legal advice, predictions about a custody, support, or divorce outcome, and advice on whether to file, respond, or violate a court order. Every reply carries a disclaimer appended by application code, in the sender's language.",
+  },
+  {
+    q: "What if someone reports a safety concern?",
+    a: "It's recorded as a flag only — the model is told never to ask for or repeat a description of an incident. A reported safety concern is flagged time-critical immediately, alerts your team, and gets a brief acknowledgment draft that also names 911 for immediate danger. A person still reviews and approves the send.",
+  },
+  {
+    q: "Who decides the deadlines?",
+    a: "There is no deadline table for family law — filing and response windows vary too widely by state and county to publish safely. A hearing date or a response-due date is shown only when the sender says they were actually told it, exactly as stated, never computed from a rule. An attorney at your firm still confirms how the practice wants that handled, in Settings.",
+  },
+  {
+    q: "Will this replace our intake staff?",
+    a: "No. Nightshift reads, sorts, scores, and drafts. A person at your firm reviews and approves every outbound reply before it sends — edits included and logged.",
+  },
+  {
+    q: "What if a lead matches an existing client or the other party in a case?",
+    a: "It's checked against your firm's conflict list automatically — the sender and the other party named in the message. A match holds the reply and requires an admin to release it.",
+  },
+  {
+    q: "What channels and languages does it cover?",
+    a: "Voicemail, SMS, WhatsApp, email, and your web intake form. The public form and the reply disclaimer are in English and Spanish, and replies are drafted in the sender's language.",
+  },
+];
+
 interface HeroMedia {
   src: string;
   alt: string;
@@ -333,12 +399,28 @@ const AREA_COPY: Record<PracticeArea, AreaCopy> = {
     cards: CRIMINAL_CARDS,
     faqs: CRIMINAL_FAQS,
   },
+  family_law: {
+    media: {
+      src: "/screenshot-family.png",
+      alt: "Nightshift's family-law case screen for a sample lead: a red time-critical banner for a reported safety concern, a hearing date shown exactly as the sender was told, who the other party is, and a reply waiting for a person to approve",
+      label: "Sample family-law case file",
+      caption: "The real screen, filled with fictional sample data: a reported safety concern is flagged time-critical by code, and the reply waits for a person to approve.",
+    },
+    structureStep: "The raw message becomes a case file: the other party, children involved, the court calendar, priority score.",
+    headline: ["Somebody just called your firm at 3 AM", "about a custody dispute."],
+    lede: "Nobody answers a law office at 3:12 AM — and a reported safety concern can't wait until morning. Nightshift reads every after-hours message, flags what's time-critical, and drafts the reply.",
+    checklist: FAMILY_CHECKLIST,
+    guarantees: FAMILY_GUARANTEES,
+    cards: FAMILY_CARDS,
+    faqs: FAMILY_FAQS,
+  },
 };
 
 const AREA_TABS: { area: PracticeArea; label: string; href: string }[] = [
   { area: "personal_injury", label: "Personal injury", href: "/" },
   { area: "immigration", label: "Immigration", href: "/?area=immigration" },
   { area: "criminal_defense", label: "Criminal defense", href: "/?area=criminal" },
+  { area: "family_law", label: "Family law", href: "/?area=family" },
 ];
 
 function Section({

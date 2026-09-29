@@ -6,6 +6,12 @@ import type {
   WriterRole,
 } from "./criminal-schema";
 import type {
+  FamilyCaseStage,
+  FamilyCaseType,
+  FamilyHearingType,
+  OtherPartyRelationship,
+} from "./family-schema";
+import type {
   CurrentStatus,
   ImmigrationCaseType,
   NoticeType,
@@ -29,6 +35,7 @@ export const PRACTICE_AREA_LABEL: Record<PracticeArea, string> = {
   personal_injury: "Personal injury",
   immigration: "Immigration",
   criminal_defense: "Criminal defense",
+  family_law: "Family law",
 };
 
 // What a firm's `practiceLine` (the free-text display label) defaults to when
@@ -37,6 +44,7 @@ export const DEFAULT_PRACTICE_LINE: Record<PracticeArea, string> = {
   personal_injury: "Injury Law",
   immigration: "Immigration Law",
   criminal_defense: "Criminal Defense",
+  family_law: "Family Law",
 };
 
 export const IMMIGRATION_CASE_TYPE_LABEL: Record<ImmigrationCaseType, string> = {
@@ -97,6 +105,44 @@ export const CASE_STAGE_LABEL: Record<CaseStage, string> = {
   pending: "Case pending",
   post_conviction: "After conviction",
   probation: "On probation",
+  unknown: "Stage unknown",
+};
+
+export const FAMILY_CASE_TYPE_LABEL: Record<FamilyCaseType, string> = {
+  divorce: "Divorce",
+  child_custody: "Child custody",
+  child_support: "Child support",
+  spousal_support: "Spousal support",
+  protective_order: "Protective order",
+  paternity: "Paternity",
+  adoption: "Adoption",
+  modification_enforcement: "Modification / enforcement",
+  other: "Other family",
+  not_a_case: "Not a case",
+};
+
+export const OTHER_PARTY_RELATIONSHIP_LABEL: Record<OtherPartyRelationship, string> = {
+  spouse: "Spouse",
+  former_spouse: "Former spouse",
+  co_parent: "Co-parent",
+  other: "Other",
+  unknown: "Relationship unclear",
+};
+
+export const FAMILY_HEARING_TYPE_LABEL: Record<FamilyHearingType, string> = {
+  initial: "Initial hearing",
+  temporary_orders: "Temporary-orders hearing",
+  mediation: "Mediation",
+  trial: "Trial",
+  other: "Court date",
+  unknown: "Court date",
+};
+
+export const FAMILY_CASE_STAGE_LABEL: Record<FamilyCaseStage, string> = {
+  not_yet_filed: "Not yet filed",
+  filed: "Filed",
+  pending: "Pending",
+  post_judgment: "Post-judgment",
   unknown: "Stage unknown",
 };
 

@@ -43,6 +43,9 @@ export const FORM_DETAINED_KEY = "Currently detained";
 // The public criminal-defense form's equivalent: "is the person in custody?"
 export const FORM_IN_CUSTODY_KEY = "In custody";
 
+// The public family-law form's equivalent: "do you have a safety concern?"
+export const FORM_SAFETY_CONCERN_KEY = "Safety concern";
+
 function formAnswer(lead: LeadRow, key: string): boolean | undefined {
   const fields = (lead.meta as { formFields?: Record<string, string> } | null)?.formFields;
   return fields?.[key] === "Yes" ? true : undefined;
@@ -97,6 +100,8 @@ export async function runProcessLead(leadId: string): Promise<void> {
     formDetained: firm.practiceArea === "immigration" ? formAnswer(lead, FORM_DETAINED_KEY) : undefined,
     formInCustody:
       firm.practiceArea === "criminal_defense" ? formAnswer(lead, FORM_IN_CUSTODY_KEY) : undefined,
+    formSafetyConcern:
+      firm.practiceArea === "family_law" ? formAnswer(lead, FORM_SAFETY_CONCERN_KEY) : undefined,
   });
   const { caseFile, draftReply } = result;
 

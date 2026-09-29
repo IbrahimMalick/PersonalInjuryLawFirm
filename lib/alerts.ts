@@ -1,5 +1,5 @@
 // Real-time notification for high-priority leads (personal injury "sign_now";
-// immigration and criminal defense "sign_now" or time-critical). The AI can read a lead at
+// immigration, criminal defense, and family law "sign_now" or time-critical). The AI can read a lead at
 // 3 AM, but nothing about that helps unless a person finds out — this closes
 // that gap: the moment a lead routes "sign_now", every active user at the
 // firm gets an email immediately, and a reminder if it's still unapproved
@@ -15,6 +15,7 @@ import {
   caseTypeLabelOf,
   contactOf,
   isCriminalCaseFile,
+  isFamilyCaseFile,
   isImmigrationCaseFile,
   isTimeCritical,
   type AnyCaseFile,
@@ -61,13 +62,16 @@ export async function notifyHighPriorityLead(
     "",
     // Coarse reasons only (never dates) — the exact deadlines stay behind the
     // attorney acknowledgment in Settings.
-    ...((isImmigrationCaseFile(caseFile) || isCriminalCaseFile(caseFile)) &&
+    ...((isImmigrationCaseFile(caseFile) || isCriminalCaseFile(caseFile) || isFamilyCaseFile(caseFile)) &&
     caseFile.timeCriticalReasons.length > 0
       ? [`Why: ${caseFile.timeCriticalReasons.join("; ")}`, ""]
       : []),
     `Priority ${caseFile.priorityScore}/100 — ${caseFile.scoreRationale}`,
     `Case type: ${caseTypeLabelOf(caseFile)}`,
-    !isImmigrationCaseFile(caseFile) && !isCriminalCaseFile(caseFile) && caseFile.injuryDescription
+    !isImmigrationCaseFile(caseFile) &&
+    !isCriminalCaseFile(caseFile) &&
+    !isFamilyCaseFile(caseFile) &&
+    caseFile.injuryDescription
       ? `Injury: ${caseFile.injuryDescription}`
       : null,
     caseFile.conflictFlags.length > 0 ? "Note: this lead is also conflict-held." : null,
