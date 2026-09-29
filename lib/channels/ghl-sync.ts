@@ -12,6 +12,7 @@ import {
   caseTypeLabelOf,
   contactOf,
   isCriminalCaseFile,
+  isFamilyCaseFile,
   isImmigrationCaseFile,
   isTimeCritical,
   type AnyCaseFile,
@@ -20,6 +21,8 @@ import {
   BAIL_STATUS_LABEL,
   CASE_STAGE_LABEL,
   CURRENT_STATUS_LABEL,
+  FAMILY_CASE_STAGE_LABEL,
+  OTHER_PARTY_RELATIONSHIP_LABEL,
   WRITER_ROLE_LABEL,
   NOTICE_TYPE_LABEL,
   ROUTING_LABEL,
@@ -167,6 +170,39 @@ export function noteBody(input: LeadSyncInput): string {
             ? `Deadline:    ${d.label} — ${d.deadlineISO} — ${d.daysRemaining} days left — ${d.basis}`
             : `Deadline:    ${d.label} — ${d.basis}`
         );
+      }
+    }
+    if (cf.missingInfo.length > 0) {
+      L.push("", "Intake still needs:");
+      cf.missingInfo.forEach((q) => L.push(`  - ${q}`));
+    }
+  } else if (isFamilyCaseFile(cf)) {
+    L.push(`Case type:   ${caseTypeLabelOf(cf)}`);
+    L.push(`Priority:    ${cf.priorityScore}/100`);
+    L.push(`Rationale:   ${cf.scoreRationale}`);
+    L.push(`Routing:     ${ROUTING_LABEL[cf.routing]}`);
+    L.push(`Confidence:  ${Math.round(cf.confidence * 100)}%`);
+    if (cf.timeCritical) L.push(`TIME-CRITICAL: ${cf.timeCriticalReasons.join("; ")}`);
+    if (cf.needsHumanReview) L.push("Flagged for human review.");
+    if (cf.conflictFlags.length > 0) L.push(`CONFLICT HOLD: ${cf.conflictFlags.join("; ")}`);
+    L.push("");
+    if (cf.otherParty.name) {
+      L.push(`Other party: ${cf.otherParty.name} (${OTHER_PARTY_RELATIONSHIP_LABEL[cf.otherParty.relationship]})`);
+    }
+    if (cf.childrenInvolved === true) L.push("Children:    involved");
+    if (cf.safetyConcern === true) L.push("SAFETY:      concern reported");
+    if (cf.existingProtectiveOrder === true) L.push("Protective order: exists");
+    if (cf.servedWithPapers === true) L.push("Served:      yes (as reported)");
+    if (cf.court.courtName || cf.court.jurisdiction) {
+      L.push(`Court:       ${[cf.court.courtName, cf.court.jurisdiction].filter(Boolean).join(" — ")}`);
+    }
+    L.push(`Stage:       ${FAMILY_CASE_STAGE_LABEL[cf.court.caseStage]}`);
+    // Every entry here is a date the sender was told, not a computed rule —
+    // still gated the same way, so staff never see it as pre-vetted before an
+    // attorney has reviewed how the practice handles it.
+    if (input.deadlinesVisible) {
+      for (const d of cf.deadlines) {
+        L.push(`Date:        ${d.label} — ${d.deadlineISO} — ${d.daysRemaining} days left — ${d.basis}`);
       }
     }
     if (cf.missingInfo.length > 0) {

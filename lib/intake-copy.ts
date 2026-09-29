@@ -96,9 +96,22 @@ export interface CriminalExtras {
   courtHint: string;
 }
 
+export interface FamilyExtras {
+  /** Shown above the message box. */
+  safetyNotice: string;
+  otherPartyLabel: string;
+  safetyConcernLabel: string;
+  safetyConcernYes: string;
+  safetyConcernNo: string;
+  safetyConcernUnsure: string;
+  hearingDateLabel: string;
+  hearingDateHint: string;
+}
+
 export interface AreaIntakeCopy extends IntakeCopy {
   immigration?: ImmigrationExtras;
   criminal?: CriminalExtras;
+  family?: FamilyExtras;
 }
 
 export const IMMIGRATION_INTAKE_COPY: Record<IntakeLang, AreaIntakeCopy> = {
@@ -230,9 +243,75 @@ export const CRIMINAL_INTAKE_COPY: Record<IntakeLang, AreaIntakeCopy> = {
   },
 };
 
+// ── Family law ────────────────────────────────────────────────────────────────
+// The form asks who the other side is and whether there is a safety concern —
+// as a flag, never a description — plus any hearing date the sender knows.
+
+export const FAMILY_INTAKE_COPY: Record<IntakeLang, AreaIntakeCopy> = {
+  en: {
+    intro:
+      "Tell us about your situation. It's okay if you don't have every detail — we can start with whatever you know, like who the other party is and any hearing date.",
+    firstName: "First name",
+    lastName: "Last name",
+    phone: "Phone",
+    email: "Email",
+    whatHappened: "What is going on?",
+    attachmentsLabel: "Court papers or documents (optional)",
+    attachmentsHint: "A petition, a notice, an order — up to 5 files, 8MB each.",
+    submit: "Send to our intake team",
+    disclaimer:
+      "Submitting this form does not create an attorney-client relationship, and nothing here is legal advice. We have not agreed to represent you. A member of our team reviews every inquiry personally. If you have a safety concern, please say so below rather than describing it here. If anyone is in immediate danger, call 911.",
+    confirmTitle: "We got your message",
+    confirmBody:
+      "A member of our team personally reviews every inquiry — day or night. If you gave us a phone number or email, we'll be in touch soon.",
+    emergency: "If anyone is in immediate danger, call 911.",
+    family: {
+      safetyNotice:
+        "If you have a safety concern (domestic violence, or a need for a protective order), please just check the box below rather than describing it here — your attorney will discuss it with you directly and confidentially.",
+      otherPartyLabel: "Name of the other party (spouse, former spouse, co-parent) — optional",
+      safetyConcernLabel: "Do you have a safety concern?",
+      safetyConcernYes: "Yes",
+      safetyConcernNo: "No",
+      safetyConcernUnsure: "Not sure",
+      hearingDateLabel: "Date of an upcoming hearing, if you know it (optional)",
+      hearingDateHint: "It helps us reach you in time.",
+    },
+  },
+  es: {
+    intro:
+      "Cuéntenos su situación. No hay problema si no tiene todos los detalles — podemos comenzar con lo que sepa, como quién es la otra parte y cualquier fecha de audiencia.",
+    firstName: "Nombre",
+    lastName: "Apellido",
+    phone: "Teléfono",
+    email: "Correo electrónico",
+    whatHappened: "¿Qué está pasando?",
+    attachmentsLabel: "Documentos de la corte (opcional)",
+    attachmentsHint: "Una petición, un aviso, una orden — hasta 5 archivos, 8MB cada uno.",
+    submit: "Enviar a nuestro equipo de admisión",
+    disclaimer:
+      "Enviar este formulario no crea una relación abogado-cliente, y nada aquí es asesoría legal. No hemos aceptado representarle. Un miembro de nuestro equipo revisa personalmente cada consulta. Si tiene una preocupación de seguridad, por favor indíquelo abajo en lugar de describirla aquí. Si alguien está en peligro inmediato, llame al 911.",
+    confirmTitle: "Recibimos su mensaje",
+    confirmBody:
+      "Un miembro de nuestro equipo revisa personalmente cada consulta — de día o de noche. Si nos dio un número de teléfono o correo electrónico, nos pondremos en contacto pronto.",
+    emergency: "Si alguien está en peligro inmediato, llame al 911.",
+    family: {
+      safetyNotice:
+        "Si tiene una preocupación de seguridad (violencia doméstica, o la necesidad de una orden de protección), por favor solo marque la casilla abajo en lugar de describirla aquí — su abogado lo hablará con usted directamente y en confidencia.",
+      otherPartyLabel: "Nombre de la otra parte (cónyuge, ex cónyuge, co-padre) — opcional",
+      safetyConcernLabel: "¿Tiene una preocupación de seguridad?",
+      safetyConcernYes: "Sí",
+      safetyConcernNo: "No",
+      safetyConcernUnsure: "No estoy seguro/a",
+      hearingDateLabel: "Fecha de una audiencia próxima, si la conoce (opcional)",
+      hearingDateHint: "Nos ayuda a comunicarnos a tiempo.",
+    },
+  },
+};
+
 /** The form copy for a firm's practice area. Personal injury is the original copy, untouched. */
 export function intakeCopyFor(area: PracticeArea, lang: IntakeLang): AreaIntakeCopy {
   if (area === "immigration") return IMMIGRATION_INTAKE_COPY[lang];
   if (area === "criminal_defense") return CRIMINAL_INTAKE_COPY[lang];
+  if (area === "family_law") return FAMILY_INTAKE_COPY[lang];
   return INTAKE_COPY[lang];
 }

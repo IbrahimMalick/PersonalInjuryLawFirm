@@ -29,6 +29,7 @@ export default async function IntakeForm({
   const t = intakeCopyFor(firm.practiceArea, lang);
   const imm = t.immigration;
   const crim = t.criminal;
+  const fam = t.family;
 
   const input =
     "w-full rounded-sm border border-papertext/25 bg-white px-3 py-2.5 text-[16px] text-papertext focus:outline focus:outline-2 focus:outline-carbon";
@@ -112,10 +113,48 @@ export default async function IntakeForm({
                 {crim.narrativeWarning}
               </p>
             )}
+            {fam && (
+              <p
+                className="rounded-sm border-2 border-stamp/60 bg-stamp/10 px-3 py-2 text-[14px] leading-snug"
+                role="note"
+              >
+                {fam.safetyNotice}
+              </p>
+            )}
             <label className="block">
               <span className="field-label text-paperdim">{t.whatHappened}</span>
               <textarea name="message" rows={crim ? 4 : 6} className={input} />
             </label>
+            {fam && (
+              <>
+                <label className="block">
+                  <span className="field-label text-paperdim">{fam.otherPartyLabel}</span>
+                  <input name="otherParty" className={input} />
+                </label>
+                <fieldset className="block">
+                  <legend className="field-label text-paperdim">{fam.safetyConcernLabel}</legend>
+                  <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-[16px]">
+                    {(
+                      [
+                        ["yes", fam.safetyConcernYes],
+                        ["no", fam.safetyConcernNo],
+                        ["unsure", fam.safetyConcernUnsure],
+                      ] as const
+                    ).map(([value, label]) => (
+                      <label key={value} className="flex items-center gap-2">
+                        <input type="radio" name="safetyConcern" value={value} />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                <label className="block">
+                  <span className="field-label text-paperdim">{fam.hearingDateLabel}</span>
+                  <input name="hearingDate" type="date" className={input} />
+                  <span className="block text-[13px] text-paperdim mt-1">{fam.hearingDateHint}</span>
+                </label>
+              </>
+            )}
             {crim && (
               <>
                 <fieldset className="block">

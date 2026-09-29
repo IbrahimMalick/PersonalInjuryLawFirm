@@ -147,6 +147,36 @@ export async function POST(request: Request) {
     }
   }
 
+  // Family-law firms' form: the other party's name, a safety-concern flag
+  // (never a description — the "safety concern" answer is a code backstop in
+  // lib/pipeline.ts), and any hearing date the sender knows.
+  if (firm.practiceArea === "family_law") {
+    const otherParty = (fields.otherParty ?? "").trim().slice(0, 150);
+    const safetyRaw = (fields.safetyConcern ?? "").trim().toLowerCase();
+    const hearingDateRaw = (fields.hearingDate ?? "").trim();
+    const safety =
+      safetyRaw === "yes"
+        ? "Yes"
+        : safetyRaw === "no"
+          ? "No"
+          : safetyRaw === "unsure"
+            ? "Not sure"
+            : "";
+    const hearingDate = /^\d{4}-\d{2}-\d{2}$/.test(hearingDateRaw) ? hearingDateRaw : "";
+    if (otherParty) {
+      extraLines.push(`Other party's name (as given by sender): ${otherParty}`);
+      extraFields["Other party"] = otherParty;
+    }
+    if (safety) {
+      extraLines.push(`Do you have a safety concern? (form question, answered by sender): ${safety}`);
+      extraFields["Safety concern"] = safety;
+    }
+    if (hearingDate) {
+      extraLines.push(`Upcoming hearing date (as given by sender): ${hearingDate}`);
+      extraFields["Upcoming hearing date"] = hearingDate;
+    }
+  }
+
   const raw = [
     `First name: ${firstName || "(blank)"}`,
     `Last name: ${lastName || "(blank)"}`,

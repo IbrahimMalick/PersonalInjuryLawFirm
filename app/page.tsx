@@ -183,7 +183,7 @@ export default async function Inbox({
   if (isDemo()) redirect("/demo");
   if (!(await currentUser())) {
     // The public landing page speaks to one practice area at a time
-    // (?area=immigration, ?area=criminal).
+    // (?area=immigration, ?area=criminal, ?area=family).
     const { area } = await searchParams;
     return (
       <Landing
@@ -192,7 +192,9 @@ export default async function Inbox({
             ? "immigration"
             : area === "criminal"
               ? "criminal_defense"
-              : "personal_injury"
+              : area === "family"
+                ? "family_law"
+                : "personal_injury"
         }
       />
     );

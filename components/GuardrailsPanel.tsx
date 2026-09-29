@@ -5,6 +5,7 @@ import {
   CRIMINAL_REVIEW_RULES,
   criminalReplyFor,
   disclaimerFor,
+  FAMILY_REVIEW_RULES,
   IMMIGRATION_REVIEW_RULES,
   REVIEW_RULES,
   timeCriticalAckFor,
@@ -72,6 +73,25 @@ const CRIMINAL_NEVER = [
   },
 ];
 
+const FAMILY_NEVER = [
+  {
+    title: "No legal advice",
+    body: "The engine routes inquiries. It never applies family law to a person's facts, never predicts custody, support, or a divorce outcome, and never advises anyone what to do.",
+  },
+  {
+    title: "No talk of an incident",
+    body: "It never asks the sender to describe abuse or violence, and never records or repeats any description given. A reported safety concern is kept as a flag only.",
+  },
+  {
+    title: "No advice on orders",
+    body: "It never advises anyone whether to file, respond, move out, withhold a child, or violate an existing court order.",
+  },
+  {
+    title: "Nothing signed, nothing sent",
+    body: "Every draft is queued for a person. A reported safety concern alerts the team immediately. The Send button is a human's finger, not a webhook.",
+  },
+];
+
 export default function GuardrailsPanel({
   firmName,
   practiceArea = "personal_injury",
@@ -84,7 +104,8 @@ export default function GuardrailsPanel({
 }) {
   const immigration = practiceArea === "immigration";
   const criminal = practiceArea === "criminal_defense";
-  const never = criminal ? CRIMINAL_NEVER : immigration ? IMMIGRATION_NEVER : NEVER;
+  const family = practiceArea === "family_law";
+  const never = criminal ? CRIMINAL_NEVER : immigration ? IMMIGRATION_NEVER : family ? FAMILY_NEVER : NEVER;
   return (
     <div className="px-6 pt-6 pb-12 max-w-[1280px] mx-auto">
       <header className="max-w-2xl">
@@ -169,6 +190,20 @@ export default function GuardrailsPanel({
             </section>
           )}
 
+          {family && (
+            <section>
+              <div className="field-label text-dim pb-2">
+                For a reported safety concern or an imminent date — the draft is written by code
+              </div>
+              <div className="rounded-sm bg-paper text-papertext p-4 text-[14px] leading-snug space-y-3">
+                <p>{timeCriticalAckFor("en", firmName)}</p>
+                <p className="border-t border-papertext/15 pt-3">
+                  {timeCriticalAckFor("es", firmName)}
+                </p>
+              </div>
+            </section>
+          )}
+
           <section>
             <div className="field-label text-dim pb-2">Human review is forced when…</div>
             <ul className="rounded-sm border border-ink-line bg-ink-raised p-4 space-y-2 text-[15px]">
@@ -198,6 +233,14 @@ export default function GuardrailsPanel({
                   person may be detained, or a hearing or deadline is within{" "}
                   {IMMIGRATION_REVIEW_RULES.timeCriticalWindowDays} days. It is never routed to
                   decline or follow-up, and the team is alerted at once.
+                </li>
+              )}
+              {family && FAMILY_REVIEW_RULES.forcedOnTimeCritical && (
+                <li className="flex gap-2.5">
+                  <span className="text-stamp font-mono">▸</span> The lead is time-critical — a
+                  safety concern was reported, or a hearing or response date is within{" "}
+                  {FAMILY_REVIEW_RULES.timeCriticalWindowDays} days. It is never routed to decline
+                  or follow-up, and the team is alerted at once.
                 </li>
               )}
             </ul>
@@ -233,6 +276,13 @@ export default function GuardrailsPanel({
                       copied into the CRM.
                     </p>
                   )}
+                  {family && (
+                    <p>
+                      <span className="text-manila font-mono">▸</span> A reported safety concern
+                      is kept as a flag only, never a description — the case file has no field for
+                      an account of any incident.
+                    </p>
+                  )}
                 </>
               ) : (
                 <>
@@ -249,17 +299,31 @@ export default function GuardrailsPanel({
                 </>
               )}
               <p>
-                <span className="text-manila font-mono">▸</span> Filing deadlines come from a
-                reviewed table in{" "}
-                <span className="font-mono text-sm">
-                  {criminal
-                    ? "lib/criminal-deadlines.ts"
-                    : immigration
-                      ? "lib/immigration-deadlines.ts"
-                      : "lib/sol-table.ts"}
-                </span>{" "}
-                plus date arithmetic. A model that hallucinates a deadline is a malpractice
-                generator, so the model is never asked for one.
+                <span className="text-manila font-mono">▸</span>{" "}
+                {family ? (
+                  <>
+                    There is no deadline table for family law — filing and response windows vary
+                    too widely by state and county to publish safely. Only a date the sender says
+                    they were actually told (a hearing, a response-due date) is shown, exactly as
+                    stated, from{" "}
+                    <span className="font-mono text-sm">lib/family-deadlines.ts</span>. It is
+                    never a computed legal rule, and it still needs an attorney&apos;s review
+                    before reviewers see it.
+                  </>
+                ) : (
+                  <>
+                    Filing deadlines come from a reviewed table in{" "}
+                    <span className="font-mono text-sm">
+                      {criminal
+                        ? "lib/criminal-deadlines.ts"
+                        : immigration
+                          ? "lib/immigration-deadlines.ts"
+                          : "lib/sol-table.ts"}
+                    </span>{" "}
+                    plus date arithmetic. A model that hallucinates a deadline is a malpractice
+                    generator, so the model is never asked for one.
+                  </>
+                )}
               </p>
             </div>
           </section>

@@ -141,19 +141,30 @@ export default async function SettingsPage({
 
             {/* SOL acknowledgment */}
             <div className={card}>
-              <h2 className={h2}>Deadline table</h2>
+              <h2 className={h2}>{firm.practiceArea === "family_law" ? "Dates shown to reviewers" : "Deadline table"}</h2>
               <p className="text-sm text-dim leading-snug">
                 {firm.practiceArea === "immigration"
                   ? "Deadline countdowns (hearing dates, notice-response and appeal windows, filing bars) come from a reviewed table plus date math — never from the model. "
                   : firm.practiceArea === "criminal_defense"
                     ? "Deadline countdowns (court dates, appeal windows, DUI license-hearing requests) come from a reviewed table plus date math — never from the model. Appeal and license-hearing windows vary widely by state and court. "
-                    : "Filing-deadline countdowns come from a reviewed table plus date math — never from the model. "}
-                The table ships as illustrative data:{" "}
-                <span className="text-inktext">
-                  an attorney at your firm must review it against current law and acknowledge
-                  it before deadlines are shown to reviewers.
-                </span>{" "}
-                Ask us for the current table during onboarding — we&apos;ll walk it together.
+                    : firm.practiceArea === "family_law"
+                      ? "There is no deadline table for family law — filing and response windows vary too widely by state and county to publish safely. A hearing or response-due date is shown only when the sender says they were actually told it, exactly as stated, never as a computed rule. "
+                      : "Filing-deadline countdowns come from a reviewed table plus date math — never from the model. "}
+                {firm.practiceArea === "family_law" ? (
+                  <span className="text-inktext">
+                    an attorney at your firm should still confirm how this practice wants stated
+                    dates handled before reviewers see them.
+                  </span>
+                ) : (
+                  <>
+                    The table ships as illustrative data:{" "}
+                    <span className="text-inktext">
+                      an attorney at your firm must review it against current law and acknowledge
+                      it before deadlines are shown to reviewers.
+                    </span>{" "}
+                    Ask us for the current table during onboarding — we&apos;ll walk it together.
+                  </>
+                )}
               </p>
               {firm.solAcknowledgedAt ? (
                 <p className="field-label text-ok mt-3">
@@ -163,7 +174,9 @@ export default async function SettingsPage({
               ) : (
                 <form action={acknowledgeSol} className="mt-3">
                   <button className="rounded-sm border-2 border-stamp text-stamp font-display font-bold uppercase tracking-wider px-4 py-2 hover:bg-stamp/10">
-                    I reviewed the table — show deadlines
+                    {firm.practiceArea === "family_law"
+                      ? "Confirmed — show stated dates"
+                      : "I reviewed the table — show deadlines"}
                   </button>
                 </form>
               )}

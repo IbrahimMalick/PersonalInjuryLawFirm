@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 import AppShell from "@/components/product/AppShell";
 import CriminalCaseView from "@/components/product/CriminalCaseView";
+import FamilyCaseView from "@/components/product/FamilyCaseView";
 import ImmigrationCaseView, { TimeCriticalBanner } from "@/components/product/ImmigrationCaseView";
 import ReviewPanel from "@/components/product/ReviewPanel";
 import { audit } from "@/lib/audit";
@@ -13,6 +14,7 @@ import {
   contactOf,
   guidanceSentence,
   isCriminalCaseFile,
+  isFamilyCaseFile,
   isImmigrationCaseFile,
   practiceAreaOf,
   type AnyCaseFile,
@@ -102,10 +104,12 @@ export default async function LeadReview({ params }: { params: Promise<{ id: str
     .orderBy(asc(tables.auditEvents.id));
 
   const cf = (lead.caseFile as unknown as AnyCaseFile | null) ?? null;
-  // Three case-file shapes (personal injury, immigration, criminal defense) — narrow once, here.
-  const pi = cf && !isImmigrationCaseFile(cf) && !isCriminalCaseFile(cf) ? cf : null;
+  // Four case-file shapes (personal injury, immigration, criminal defense, family law) — narrow once, here.
+  const pi =
+    cf && !isImmigrationCaseFile(cf) && !isCriminalCaseFile(cf) && !isFamilyCaseFile(cf) ? cf : null;
   const imm = cf && isImmigrationCaseFile(cf) ? cf : null;
   const crim = cf && isCriminalCaseFile(cf) ? cf : null;
+  const fam = cf && isFamilyCaseFile(cf) ? cf : null;
   const sol = pi?.statuteOfLimitations;
   const solUrgent = sol?.daysRemaining != null && sol.daysRemaining < 180;
   const conflict = (cf?.conflictFlags.length ?? 0) > 0;
@@ -194,6 +198,7 @@ export default async function LeadReview({ params }: { params: Promise<{ id: str
                         ? ` · ${imm.applicant.countryOfCitizenship}`
                         : ""}
                       {crim?.court.jurisdiction ? ` · ${crim.court.jurisdiction}` : ""}
+                      {fam?.otherParty.name ? ` · vs. ${fam.otherParty.name}` : ""}
                     </div>
                   </div>
                   <span
@@ -223,6 +228,12 @@ export default async function LeadReview({ params }: { params: Promise<{ id: str
                 note="Do not queue this for morning. Someone may be in custody, or a court date or deadline is very close."
               />
             )}
+            {fam && (
+              <TimeCriticalBanner
+                cf={fam}
+                note="Do not queue this for morning. A safety concern was reported, or a hearing or response date is very close."
+              />
+            )}
 
             {conflict && cf && (
               <div className="rounded-sm border-2 border-stamp bg-stamp/10 px-5 py-3">
@@ -241,6 +252,7 @@ export default async function LeadReview({ params }: { params: Promise<{ id: str
 
             {imm && <ImmigrationCaseView cf={imm} deadlinesVisible={solAcknowledged} />}
             {crim && <CriminalCaseView cf={crim} deadlinesVisible={solAcknowledged} />}
+            {fam && <FamilyCaseView cf={fam} deadlinesVisible={solAcknowledged} />}
 
             {pi && (
               <div className="grid grid-cols-2 gap-3">
