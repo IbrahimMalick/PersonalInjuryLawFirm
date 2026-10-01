@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import {
+  AREA_TABS,
   CHANNELS,
   Eyebrow,
   Foot,
@@ -116,7 +117,18 @@ export default function HomeLanding() {
         <Section className="pt-12 pb-10">
           <div className="grid lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] gap-10 items-center">
             <div>
-              <div className="field-label text-manila mb-3">One desk · four practice areas</div>
+              <div className="flex flex-wrap items-center gap-2 pb-5" role="group" aria-label="Practice area">
+                <span className="field-label text-dim mr-1">Built for</span>
+                {AREA_TABS.map((t) => (
+                  <Link
+                    key={t.area}
+                    href={t.href}
+                    className="rounded-sm border border-ink-line px-3 py-1 font-display text-sm font-bold uppercase tracking-wider text-dim hover:border-manila hover:text-manila"
+                  >
+                    {t.label}
+                  </Link>
+                ))}
+              </div>
               <div className="font-mono text-meter text-xl tabular-nums pb-3">3:12 AM</div>
               <h1 className="font-display font-bold uppercase tracking-wide text-4xl sm:text-5xl leading-[1.05]">
                 <span className="text-paper">Nobody answers your law firm</span>
@@ -175,7 +187,7 @@ export default function HomeLanding() {
 
             <div>
               <div className="field-label text-manila mb-3">Which one are you?</div>
-              <div className="grid sm:grid-cols-2 gap-3" role="group" aria-label="Practice area">
+              <div className="grid sm:grid-cols-2 gap-3" role="group" aria-label="Choose your practice area">
                 {AREA_PICKS.map((a) => (
                   <Link
                     key={a.href}
