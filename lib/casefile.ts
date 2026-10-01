@@ -1,13 +1,13 @@
-import type { CriminalCaseFile } from "./criminal-schema";
-import type { FamilyCaseFile } from "./family-schema";
-import type { ImmigrationCaseFile } from "./immigration-schema";
+import { CRIMINAL_CASE_TYPES, type CriminalCaseFile } from "./criminal-schema";
+import { FAMILY_CASE_TYPES, type FamilyCaseFile } from "./family-schema";
+import { IMMIGRATION_CASE_TYPES, type ImmigrationCaseFile } from "./immigration-schema";
 import {
   CASE_TYPE_LABEL,
   CRIMINAL_CASE_TYPE_LABEL,
   FAMILY_CASE_TYPE_LABEL,
   IMMIGRATION_CASE_TYPE_LABEL,
 } from "./labels";
-import type { CaseFile, PracticeArea } from "./schema";
+import { CASE_TYPES, type CaseFile, type PracticeArea } from "./schema";
 
 // A stored case file is one of four shapes, told apart by `practiceArea`. Every
 // case file written before practice areas existed has no such field and is
@@ -63,6 +63,20 @@ export function caseTypeLabelOf(cf: AnyCaseFile): string {
   if (isCriminalCaseFile(cf)) return CRIMINAL_CASE_TYPE_LABEL[cf.caseType];
   if (isFamilyCaseFile(cf)) return FAMILY_CASE_TYPE_LABEL[cf.caseType];
   return CASE_TYPE_LABEL[cf.caseType];
+}
+
+/** The case-type dropdown options for a firm's practice area — value is the raw enum, used to filter stored case files. */
+export function caseTypeOptionsFor(area: PracticeArea): { value: string; label: string }[] {
+  if (area === "immigration") {
+    return IMMIGRATION_CASE_TYPES.map((v) => ({ value: v, label: IMMIGRATION_CASE_TYPE_LABEL[v] }));
+  }
+  if (area === "criminal_defense") {
+    return CRIMINAL_CASE_TYPES.map((v) => ({ value: v, label: CRIMINAL_CASE_TYPE_LABEL[v] }));
+  }
+  if (area === "family_law") {
+    return FAMILY_CASE_TYPES.map((v) => ({ value: v, label: FAMILY_CASE_TYPE_LABEL[v] }));
+  }
+  return CASE_TYPES.map((v) => ({ value: v, label: CASE_TYPE_LABEL[v] }));
 }
 
 /** Longest status detail that reads as a label ("F-1", "expired visitor visa") rather than prose. */
