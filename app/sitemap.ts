@@ -12,6 +12,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
   return [
     { url: `${b}/`, lastModified: now, changeFrequency: "monthly", priority: 1 },
+    { url: `${b}/immigration`, lastModified: now, changeFrequency: "monthly", priority: 0.9 },
+    { url: `${b}/criminal-defense`, lastModified: now, changeFrequency: "monthly", priority: 0.9 },
+    { url: `${b}/family-law`, lastModified: now, changeFrequency: "monthly", priority: 0.9 },
     { url: `${b}/terms`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
     { url: `${b}/privacy`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
   ];

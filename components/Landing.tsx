@@ -418,9 +418,9 @@ const AREA_COPY: Record<PracticeArea, AreaCopy> = {
 
 const AREA_TABS: { area: PracticeArea; label: string; href: string }[] = [
   { area: "personal_injury", label: "Personal injury", href: "/" },
-  { area: "immigration", label: "Immigration", href: "/?area=immigration" },
-  { area: "criminal_defense", label: "Criminal defense", href: "/?area=criminal" },
-  { area: "family_law", label: "Family law", href: "/?area=family" },
+  { area: "immigration", label: "Immigration", href: "/immigration" },
+  { area: "criminal_defense", label: "Criminal defense", href: "/criminal-defense" },
+  { area: "family_law", label: "Family law", href: "/family-law" },
 ];
 
 function Section({
