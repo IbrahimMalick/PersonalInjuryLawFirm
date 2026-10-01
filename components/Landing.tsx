@@ -472,18 +472,26 @@ export function AreaTabs({ active }: { active: PracticeArea | "home" }) {
 export function Section({
   id,
   className = "",
+  style,
   children,
 }: {
   id?: string;
   className?: string;
+  style?: React.CSSProperties;
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className={`px-6 ${className}`}>
+    <section id={id} className={`px-6 ${className}`} style={style}>
       <div className="max-w-[1100px] mx-auto">{children}</div>
     </section>
   );
 }
+
+/** The warm desk-lamp glow behind every hero — the "someone's up at 3 AM" story, in the background itself. */
+export const HERO_GLOW: React.CSSProperties = {
+  backgroundImage:
+    "radial-gradient(900px 480px at 18% -10%, rgba(255,176,32,0.10), transparent 60%)",
+};
 
 export function Eyebrow({ children }: { children: React.ReactNode }) {
   return <div className="field-label text-manila mb-3">{children}</div>;
@@ -559,7 +567,7 @@ export default function Landing({ area = "personal_injury" }: { area?: PracticeA
 
       <main className="flex-1">
         {/* Hero */}
-        <Section className="pt-12 pb-10">
+        <Section className="pt-12 pb-10" style={HERO_GLOW}>
           <div className="grid lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] gap-10 items-center">
             <div>
               <AreaTabs active={area} />
@@ -567,7 +575,7 @@ export default function Landing({ area = "personal_injury" }: { area?: PracticeA
               <h1 className="font-display font-bold uppercase tracking-wide text-4xl sm:text-5xl leading-[1.05]">
                 <span className="text-paper">{copy.headline[0]}</span>
                 <br />
-                <span className="text-manila">{copy.headline[1]}</span>
+                <span className="text-manila drop-shadow-[0_0_24px_rgba(255,176,32,0.35)]">{copy.headline[1]}</span>
               </h1>
               <p className="text-dim text-lg mt-5 max-w-xl leading-relaxed">
                 {copy.lede}{" "}
@@ -588,7 +596,7 @@ export default function Landing({ area = "personal_injury" }: { area?: PracticeA
               <div className="flex flex-wrap items-center gap-3 mt-8">
                 <Link
                   href="/signup"
-                  className="rounded-sm bg-manila text-papertext font-display font-bold uppercase tracking-wider text-lg px-6 py-3 hover:bg-manila-deep"
+                  className="rounded-sm bg-manila text-papertext font-display font-bold uppercase tracking-wider text-lg px-6 py-3 shadow-[0_10px_34px_-10px_rgba(224,168,62,0.55)] hover:bg-manila-deep hover:shadow-[0_10px_34px_-6px_rgba(224,168,62,0.7)] transition-shadow"
                 >
                   Create your firm&apos;s desk
                 </Link>
@@ -798,7 +806,7 @@ export default function Landing({ area = "personal_injury" }: { area?: PracticeA
             <div className="flex flex-wrap items-center justify-center gap-3 mt-7">
               <Link
                 href="/signup"
-                className="rounded-sm bg-manila text-papertext font-display font-bold uppercase tracking-wider text-lg px-6 py-3 hover:bg-manila-deep"
+                className="rounded-sm bg-manila text-papertext font-display font-bold uppercase tracking-wider text-lg px-6 py-3 shadow-[0_10px_34px_-10px_rgba(224,168,62,0.55)] hover:bg-manila-deep hover:shadow-[0_10px_34px_-6px_rgba(224,168,62,0.7)] transition-shadow"
               >
                 Create your firm&apos;s desk
               </Link>

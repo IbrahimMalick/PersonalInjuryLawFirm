@@ -6,6 +6,7 @@ import {
   Eyebrow,
   Foot,
   Header,
+  HERO_GLOW,
   PIPELINE,
   PROBLEMS,
   Section,
@@ -114,7 +115,7 @@ export default function HomeLanding() {
 
       <main className="flex-1">
         {/* Hero */}
-        <Section className="pt-12 pb-10">
+        <Section className="pt-12 pb-10" style={HERO_GLOW}>
           <div className="grid lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] gap-10 items-center">
             <div>
               <AreaTabs active="home" />
@@ -122,7 +123,7 @@ export default function HomeLanding() {
               <h1 className="font-display font-bold uppercase tracking-wide text-4xl sm:text-5xl leading-[1.05]">
                 <span className="text-paper">Nobody answers your law firm</span>
                 <br />
-                <span className="text-manila">at 3 AM.</span>
+                <span className="text-manila drop-shadow-[0_0_24px_rgba(255,176,32,0.35)]">at 3 AM.</span>
               </h1>
               <p className="text-dim text-lg mt-5 max-w-xl leading-relaxed">
                 Personal injury, immigration, criminal defense, family law — whatever you
@@ -145,7 +146,7 @@ export default function HomeLanding() {
               <div className="flex flex-wrap items-center gap-3 mt-8">
                 <Link
                   href="/signup"
-                  className="rounded-sm bg-manila text-papertext font-display font-bold uppercase tracking-wider text-lg px-6 py-3 hover:bg-manila-deep"
+                  className="rounded-sm bg-manila text-papertext font-display font-bold uppercase tracking-wider text-lg px-6 py-3 shadow-[0_10px_34px_-10px_rgba(224,168,62,0.55)] hover:bg-manila-deep hover:shadow-[0_10px_34px_-6px_rgba(224,168,62,0.7)] transition-shadow"
                 >
                   Create your firm&apos;s desk
                 </Link>
@@ -181,13 +182,20 @@ export default function HomeLanding() {
                   <Link
                     key={a.href}
                     href={a.href}
-                    className="group rounded-sm border border-ink-line bg-ink-raised px-5 py-5 hover:border-manila transition-colors"
+                    className="group relative overflow-hidden rounded-sm border border-ink-line bg-ink-raised px-5 py-5 transition-all duration-200 hover:border-manila hover:-translate-y-0.5 hover:shadow-[0_14px_34px_-12px_rgba(224,168,62,0.4)]"
                   >
+                    <span
+                      className="absolute top-0 left-0 right-0 h-0.5 origin-left scale-x-0 bg-manila transition-transform duration-300 group-hover:scale-x-100"
+                      aria-hidden
+                    />
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs text-manila border border-ink-line rounded-sm px-1.5 py-0.5 group-hover:border-manila">
+                      <span className="font-mono text-xs text-manila bg-manila/10 border border-manila/30 rounded-sm px-2 py-1 transition-colors group-hover:bg-manila group-hover:text-papertext">
                         {a.glyph}
                       </span>
-                      <span className="text-dim group-hover:text-manila font-mono" aria-hidden>
+                      <span
+                        className="text-dim font-mono transition-all group-hover:translate-x-0.5 group-hover:text-manila"
+                        aria-hidden
+                      >
                         →
                       </span>
                     </div>
@@ -352,7 +360,7 @@ export default function HomeLanding() {
             <div className="flex flex-wrap items-center justify-center gap-3 mt-7">
               <Link
                 href="/signup"
-                className="rounded-sm bg-manila text-papertext font-display font-bold uppercase tracking-wider text-lg px-6 py-3 hover:bg-manila-deep"
+                className="rounded-sm bg-manila text-papertext font-display font-bold uppercase tracking-wider text-lg px-6 py-3 shadow-[0_10px_34px_-10px_rgba(224,168,62,0.55)] hover:bg-manila-deep hover:shadow-[0_10px_34px_-6px_rgba(224,168,62,0.7)] transition-shadow"
               >
                 Create your firm&apos;s desk
               </Link>
