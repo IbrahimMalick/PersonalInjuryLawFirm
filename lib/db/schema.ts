@@ -202,6 +202,23 @@ export const jobs = pgTable(
   (t) => [index("jobs_pending_idx").on(t.status, t.runAt)]
 );
 
+// Internal team notes on a lead — "called, left voicemail," that kind of
+// coordination. Separate from the audit trail: the audit trail is a system
+// record of what the app did; this is what a person chose to tell their
+// teammates. Append-only, same as the audit trail — no edit or delete path.
+export const leadNotes = pgTable(
+  "lead_notes",
+  {
+    id: serial("id").primaryKey(),
+    firmId: integer("firm_id").notNull(),
+    leadId: text("lead_id").notNull(),
+    userId: integer("user_id").notNull(),
+    body: text("body").notNull(),
+    createdAt: text("created_at").notNull().$defaultFn(nowIso),
+  },
+  (t) => [index("lead_notes_lead_idx").on(t.leadId, t.createdAt)]
+);
+
 export const auditEvents = pgTable(
   "audit_events",
   {
@@ -224,6 +241,7 @@ export type LeadRow = typeof leads.$inferSelect;
 export type MessageRow = typeof messages.$inferSelect;
 export type JobRow = typeof jobs.$inferSelect;
 export type AdversePartyRow = typeof adverseParties.$inferSelect;
+export type LeadNoteRow = typeof leadNotes.$inferSelect;
 export type AuditRow = typeof auditEvents.$inferSelect;
 export type FirmRow = typeof firms.$inferSelect;
 export type AuthTokenRow = typeof authTokens.$inferSelect;

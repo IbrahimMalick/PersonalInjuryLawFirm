@@ -7,6 +7,7 @@ import type { LeadRow } from "../lib/db/schema";
 import type { ModelOutput } from "../lib/schema";
 import { matchNames } from "../lib/conflicts";
 import {
+  caseTypeOptionsFor,
   contactOf,
   guidanceSentence,
   isHighPriority,
@@ -570,6 +571,29 @@ describe("case-file helpers and guardrails, per practice area", () => {
     expect(matchNames([out.otherPartyInfo.name, out.claimant.name], "", parties)).toEqual(
       matchConflicts(out, "", parties)
     );
+  });
+});
+
+describe("caseTypeOptionsFor — the inbox's case-type filter dropdown", () => {
+  it("returns the right enum, labelled, for each practice area", () => {
+    const pi = caseTypeOptionsFor("personal_injury");
+    expect(pi).toContainEqual({ value: "motor_vehicle", label: "Motor vehicle" });
+    expect(pi).toContainEqual({ value: "dog_bite", label: "Dog bite" });
+
+    const imm = caseTypeOptionsFor("immigration");
+    expect(imm).toContainEqual({ value: "asylum_humanitarian", label: "Asylum / humanitarian" });
+
+    const crim = caseTypeOptionsFor("criminal_defense");
+    expect(crim).toContainEqual({ value: "dui_dwi", label: "DUI / DWI" });
+
+    const fam = caseTypeOptionsFor("family_law");
+    expect(fam).toContainEqual({ value: "child_custody", label: "Child custody" });
+  });
+  it("never mixes one area's case types into another's list", () => {
+    const pi = caseTypeOptionsFor("personal_injury").map((o) => o.value);
+    expect(pi).not.toContain("dui_dwi");
+    expect(pi).not.toContain("child_custody");
+    expect(pi).not.toContain("asylum_humanitarian");
   });
 });
 

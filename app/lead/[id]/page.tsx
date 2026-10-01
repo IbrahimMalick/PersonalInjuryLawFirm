@@ -1,4 +1,4 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
@@ -6,6 +6,7 @@ import AppShell from "@/components/product/AppShell";
 import CriminalCaseView from "@/components/product/CriminalCaseView";
 import FamilyCaseView from "@/components/product/FamilyCaseView";
 import ImmigrationCaseView, { TimeCriticalBanner } from "@/components/product/ImmigrationCaseView";
+import LeadNotesPanel from "@/components/product/LeadNotesPanel";
 import ReviewPanel from "@/components/product/ReviewPanel";
 import { audit } from "@/lib/audit";
 import { requireFirmUser } from "@/lib/auth";
@@ -81,6 +82,31 @@ async function setOutcome(formData: FormData): Promise<void> {
   revalidatePath("/insights");
 }
 
+async function addNote(formData: FormData): Promise<void> {
+  "use server";
+  const { user, firm } = await requireFirmUser();
+  const leadId = String(formData.get("leadId") ?? "");
+  const body = String(formData.get("body") ?? "").trim().slice(0, 4000);
+  if (!body) {
+    revalidatePath(`/lead/${leadId}`);
+    return;
+  }
+
+  const db = await getDb();
+  const lead = (
+    await db
+      .select({ firmId: tables.leads.firmId })
+      .from(tables.leads)
+      .where(eq(tables.leads.id, leadId))
+      .limit(1)
+  )[0];
+  if (!lead || lead.firmId !== firm.id) redirect("/");
+
+  await db.insert(tables.leadNotes).values({ firmId: firm.id, leadId, userId: user.id, body });
+  await audit("lead.note_added", { firmId: firm.id, leadId, userId: user.id });
+  revalidatePath(`/lead/${leadId}`);
+}
+
 export default async function LeadReview({ params }: { params: Promise<{ id: string }> }) {
   if (isDemo()) redirect("/demo");
   const { user, firm } = await requireFirmUser();
@@ -102,6 +128,18 @@ export default async function LeadReview({ params }: { params: Promise<{ id: str
     .from(tables.auditEvents)
     .where(eq(tables.auditEvents.leadId, id))
     .orderBy(asc(tables.auditEvents.id));
+
+  const notes = await db
+    .select({
+      id: tables.leadNotes.id,
+      body: tables.leadNotes.body,
+      createdAt: tables.leadNotes.createdAt,
+      authorName: tables.users.name,
+    })
+    .from(tables.leadNotes)
+    .leftJoin(tables.users, eq(tables.users.id, tables.leadNotes.userId))
+    .where(and(eq(tables.leadNotes.leadId, id), eq(tables.leadNotes.firmId, firm.id)))
+    .orderBy(desc(tables.leadNotes.createdAt));
 
   const cf = (lead.caseFile as unknown as AnyCaseFile | null) ?? null;
   // Four case-file shapes (personal injury, immigration, criminal defense, family law) — narrow once, here.
@@ -389,6 +427,8 @@ export default async function LeadReview({ params }: { params: Promise<{ id: str
                 </div>
               )}
             </div>
+
+            <LeadNotesPanel leadId={lead.id} notes={notes} timezone={firm.timezone} addNote={addNote} />
 
             {/* Audit trail */}
             <div className="rounded-sm border border-ink-line bg-ink-raised px-5 py-4">

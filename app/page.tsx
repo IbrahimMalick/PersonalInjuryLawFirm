@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { and, count, desc, eq, inArray, notInArray } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, lte, notInArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 import { updateFirm } from "@/lib/firm";
@@ -10,7 +10,7 @@ import HomeLanding from "@/components/HomeLanding";
 import { getDb, tables } from "@/lib/db";
 import { isDemo } from "@/lib/mode";
 import { fmtDateTime, agoLabel } from "@/lib/format";
-import { caseTypeLabelOf, contactOf, isTimeCritical, type AnyCaseFile } from "@/lib/casefile";
+import { caseTypeLabelOf, caseTypeOptionsFor, contactOf, isTimeCritical, type AnyCaseFile } from "@/lib/casefile";
 import { ROUTING_LABEL } from "@/lib/labels";
 import { leadUrgency, type Urgency } from "@/lib/urgency";
 
@@ -178,7 +178,7 @@ async function OnboardingCard({
 export default async function Inbox({
   searchParams,
 }: {
-  searchParams: Promise<{ area?: string }>;
+  searchParams: Promise<{ area?: string; q?: string; from?: string; to?: string; caseType?: string }>;
 }) {
   if (isDemo()) redirect("/demo");
   if (!(await currentUser())) {
@@ -197,14 +197,28 @@ export default async function Inbox({
   const { user, firm } = await requireFirmUser();
   const db = await getDb();
 
+  const { q, from, to, caseType } = await searchParams;
+  const query = q?.trim() ?? "";
+  const hasFilters = Boolean(query || from || to || caseType);
+
+  // Date range narrows the SQL query itself (receivedAt is an ISO string, so
+  // lexical comparison sorts correctly); text and case-type match against the
+  // case file, so those filter the fetched rows in JS below. With any filter
+  // active we also lift the usual 200-row cap — a search shouldn't silently
+  // miss a lead just because it's further back than the latest 200.
   const leads = await db
     .select()
     .from(tables.leads)
     .where(
-      and(eq(tables.leads.firmId, firm.id), notInArray(tables.leads.status, ["archived"]))
+      and(
+        eq(tables.leads.firmId, firm.id),
+        notInArray(tables.leads.status, ["archived"]),
+        from ? gte(tables.leads.receivedAt, from) : undefined,
+        to ? lte(tables.leads.receivedAt, `${to}T23:59:59.999Z`) : undefined
+      )
     )
     .orderBy(desc(tables.leads.receivedAt))
-    .limit(200);
+    .limit(hasFilters ? 1000 : 200);
 
   const repliedRows = leads.length
     ? await db
@@ -232,15 +246,34 @@ export default async function Inbox({
     return { lead, cf, needsEyes, urgency, timeCritical: isTimeCritical(cf) };
   });
 
+  // Text and case-type match against the case file / raw message — no SQL
+  // index to lean on for either, so this stays a JS filter over the (date-
+  // range-narrowed) rows fetched above.
+  const qLower = query.toLowerCase();
+  const visible = leadsWithMeta.filter(({ lead, cf }) => {
+    if (caseType && cf?.caseType !== caseType) return false;
+    if (qLower) {
+      const haystack = [cf ? contactOf(cf).name : null, lead.displayName, lead.fromAddress, lead.raw]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      if (!haystack.includes(qLower)) return false;
+    }
+    return true;
+  });
+
+  // The status strip describes whatever is currently on screen, so it moves
+  // with the filters rather than always summarizing the whole inbox.
   const counts = {
-    waiting: leads.filter(
-      (l) => l.status === "triaged" && !replied.has(l.id)
+    waiting: visible.filter(({ lead }) => lead.status === "triaged" && !replied.has(lead.id)).length,
+    attention: visible.filter(({ lead }) => lead.status === "needs_attention").length,
+    reading: visible.filter(
+      ({ lead }) => lead.status === "received" || lead.status === "processing"
     ).length,
-    attention: leads.filter((l) => l.status === "needs_attention").length,
-    reading: leads.filter((l) => l.status === "received" || l.status === "processing").length,
-    overdue: leadsWithMeta.filter((l) => l.urgency === "red" && !l.timeCritical).length,
-    timeCritical: leadsWithMeta.filter((l) => l.timeCritical && l.needsEyes).length,
+    overdue: visible.filter((l) => l.urgency === "red" && !l.timeCritical).length,
+    timeCritical: visible.filter((l) => l.timeCritical && l.needsEyes).length,
   };
+  const caseTypeOptions = caseTypeOptionsFor(firm.practiceArea);
 
   return (
     <AppShell user={user} firm={firm}>
@@ -254,6 +287,63 @@ export default async function Inbox({
             isAdmin={user.role === "admin"}
           />
         )}
+        <form
+          method="GET"
+          className="rounded-sm border border-ink-line bg-ink-raised px-4 py-3 mb-3 flex flex-wrap items-end gap-3"
+        >
+          <label className="flex-1 min-w-[220px]">
+            <span className="field-label text-dim block pb-1">Search</span>
+            <input
+              type="text"
+              name="q"
+              defaultValue={query}
+              placeholder="Name, phone, email, or message…"
+              className="w-full rounded-sm border border-ink-line bg-ink px-3 py-1.5 text-[14px] text-inktext placeholder:text-dim focus:outline focus:outline-2 focus:outline-manila"
+            />
+          </label>
+          <label>
+            <span className="field-label text-dim block pb-1">From</span>
+            <input
+              type="date"
+              name="from"
+              defaultValue={from ?? ""}
+              className="rounded-sm border border-ink-line bg-ink px-3 py-1.5 text-[14px] text-inktext focus:outline focus:outline-2 focus:outline-manila"
+            />
+          </label>
+          <label>
+            <span className="field-label text-dim block pb-1">To</span>
+            <input
+              type="date"
+              name="to"
+              defaultValue={to ?? ""}
+              className="rounded-sm border border-ink-line bg-ink px-3 py-1.5 text-[14px] text-inktext focus:outline focus:outline-2 focus:outline-manila"
+            />
+          </label>
+          <label>
+            <span className="field-label text-dim block pb-1">Case type</span>
+            <select
+              name="caseType"
+              defaultValue={caseType ?? ""}
+              className="rounded-sm border border-ink-line bg-ink px-3 py-1.5 text-[14px] text-inktext focus:outline focus:outline-2 focus:outline-manila"
+            >
+              <option value="">All case types</option>
+              {caseTypeOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button className="rounded-sm bg-manila text-papertext font-display font-bold uppercase tracking-wider text-sm px-4 py-1.5 hover:bg-manila-deep">
+            Search
+          </button>
+          {hasFilters && (
+            <Link href="/" className="field-label text-dim hover:text-inktext pb-2">
+              Clear
+            </Link>
+          )}
+        </form>
+
         <div className="flex items-center justify-between pb-3">
           <div className="flex items-center gap-5 font-mono text-sm">
             <span className="text-manila">{counts.waiting} awaiting review</span>
@@ -267,6 +357,11 @@ export default async function Inbox({
               <span className="text-stamp">{counts.attention} need attention</span>
             )}
             {counts.reading > 0 && <span className="text-meter">{counts.reading} reading</span>}
+            {hasFilters && (
+              <span className="text-dim">
+                {visible.length} result{visible.length === 1 ? "" : "s"}
+              </span>
+            )}
           </div>
           <Link href="/archive" className="field-label text-dim hover:text-inktext">
             Archive ▸
@@ -276,16 +371,30 @@ export default async function Inbox({
         {leads.length === 0 ? (
           <div className="rounded-sm border border-ink-line bg-ink-raised px-6 py-14 text-center">
             <div className="font-display uppercase tracking-widest text-dim text-xl">
-              The desk is quiet
+              {hasFilters ? "No leads match" : "The desk is quiet"}
             </div>
             <p className="text-dim mt-2 text-[15px] max-w-md mx-auto">
-              New inquiries land here the moment they arrive — from the intake form, the
-              firm&apos;s phone line, or email. Wire channels up under Settings.
+              {hasFilters
+                ? "Nothing in range matches that search. Try widening the dates or clearing a filter."
+                : "New inquiries land here the moment they arrive — from the intake form, the firm's phone line, or email. Wire channels up under Settings."}
+            </p>
+          </div>
+        ) : visible.length === 0 ? (
+          <div className="rounded-sm border border-ink-line bg-ink-raised px-6 py-14 text-center">
+            <div className="font-display uppercase tracking-widest text-dim text-xl">
+              No leads match
+            </div>
+            <p className="text-dim mt-2 text-[15px] max-w-md mx-auto">
+              Nothing matches that search. Try a different term or{" "}
+              <Link href="/" className="text-manila underline underline-offset-4">
+                clear the filters
+              </Link>
+              .
             </p>
           </div>
         ) : (
           <div className="space-y-2">
-            {leadsWithMeta.map(({ lead, cf, needsEyes, urgency, timeCritical }) => {
+            {visible.map(({ lead, cf, needsEyes, urgency, timeCritical }) => {
               return (
                 <Link
                   key={lead.id}
