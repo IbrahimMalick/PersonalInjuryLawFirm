@@ -23,7 +23,8 @@ const plexMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: "Nightshift",
-  description: "24/7 AI intake for personal-injury firms.",
+  description:
+    "24/7 AI intake for law firms — personal injury, immigration, criminal defense, and family law. Reads every after-hours message, builds a case file, and drafts the reply, a human approves every send.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

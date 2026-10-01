@@ -6,7 +6,7 @@ import { audit } from "@/lib/audit";
 import { updateFirm } from "@/lib/firm";
 import AppShell from "@/components/product/AppShell";
 import { currentUser, requireFirmUser } from "@/lib/auth";
-import Landing from "@/components/Landing";
+import HomeLanding from "@/components/HomeLanding";
 import { getDb, tables } from "@/lib/db";
 import { isDemo } from "@/lib/mode";
 import { fmtDateTime, agoLabel } from "@/lib/format";
@@ -182,17 +182,17 @@ export default async function Inbox({
 }) {
   if (isDemo()) redirect("/demo");
   if (!(await currentUser())) {
-    // Each practice area now has its own indexable route (app/immigration,
-    // app/criminal-defense, app/family-law) — same Landing component, just
-    // reached by a real URL instead of a query param. Old ?area= links (ads,
-    // bookmarks, anything already shared) still work: redirect to the
-    // canonical route rather than rendering inline, so search engines see
-    // one URL per area, not two.
+    // The root is the overview homepage — it represents all four areas, not
+    // personal injury specifically (that moved to its own route, same as the
+    // other three: app/personal-injury, app/immigration, app/criminal-defense,
+    // app/family-law). Old ?area= links (ads, bookmarks, anything already
+    // shared) still work: redirect to the canonical route rather than
+    // rendering inline, so search engines see one URL per area, not two.
     const { area } = await searchParams;
     if (area === "immigration") redirect("/immigration");
     if (area === "criminal") redirect("/criminal-defense");
     if (area === "family") redirect("/family-law");
-    return <Landing area="personal_injury" />;
+    return <HomeLanding />;
   }
   const { user, firm } = await requireFirmUser();
   const db = await getDb();
