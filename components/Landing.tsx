@@ -423,6 +423,52 @@ export const AREA_TABS: { area: PracticeArea; label: string; href: string }[] = 
   { area: "family_law", label: "Family law", href: "/family-law" },
 ];
 
+/** Shared pill button for the Home / area nav row — solid background so it reads clearly against the dark page, not just an outline. */
+function NavPill({
+  href,
+  active,
+  children,
+}: {
+  href: string;
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      className={`rounded-sm border px-3 py-1.5 font-display text-sm font-bold uppercase tracking-wider transition-colors ${
+        active
+          ? "border-manila bg-manila text-papertext"
+          : "border-ink-line bg-ink-raised text-inktext hover:border-manila hover:text-manila hover:bg-manila/10"
+      }`}
+    >
+      {children}
+    </Link>
+  );
+}
+
+/**
+ * The hero's practice-area switcher — Home, then the four areas. Shared by
+ * every public marketing page: Landing.tsx (the four area pages, their own
+ * area highlighted) and HomeLanding.tsx (the overview, "Home" highlighted).
+ */
+export function AreaTabs({ active }: { active: PracticeArea | "home" }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 pb-5" role="group" aria-label="Practice area">
+      <NavPill href="/" active={active === "home"}>
+        ⌂ Home
+      </NavPill>
+      <span className="field-label text-manila mx-1">Built for</span>
+      {AREA_TABS.map((t) => (
+        <NavPill key={t.area} href={t.href} active={t.area === active}>
+          {t.label}
+        </NavPill>
+      ))}
+    </div>
+  );
+}
+
 export function Section({
   id,
   className = "",
@@ -516,23 +562,7 @@ export default function Landing({ area = "personal_injury" }: { area?: PracticeA
         <Section className="pt-12 pb-10">
           <div className="grid lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] gap-10 items-center">
             <div>
-              <div className="flex flex-wrap items-center gap-2 pb-5" role="group" aria-label="Practice area">
-                <span className="field-label text-dim mr-1">Built for</span>
-                {AREA_TABS.map((t) => (
-                  <Link
-                    key={t.area}
-                    href={t.href}
-                    aria-current={t.area === area ? "page" : undefined}
-                    className={`rounded-sm border px-3 py-1 font-display text-sm font-bold uppercase tracking-wider ${
-                      t.area === area
-                        ? "border-manila bg-manila text-papertext"
-                        : "border-ink-line text-dim hover:border-manila hover:text-manila"
-                    }`}
-                  >
-                    {t.label}
-                  </Link>
-                ))}
-              </div>
+              <AreaTabs active={area} />
               <div className="font-mono text-meter text-xl tabular-nums pb-3">3:12 AM</div>
               <h1 className="font-display font-bold uppercase tracking-wide text-4xl sm:text-5xl leading-[1.05]">
                 <span className="text-paper">{copy.headline[0]}</span>
