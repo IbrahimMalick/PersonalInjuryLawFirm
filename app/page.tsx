@@ -182,22 +182,17 @@ export default async function Inbox({
 }) {
   if (isDemo()) redirect("/demo");
   if (!(await currentUser())) {
-    // The public landing page speaks to one practice area at a time
-    // (?area=immigration, ?area=criminal, ?area=family).
+    // Each practice area now has its own indexable route (app/immigration,
+    // app/criminal-defense, app/family-law) — same Landing component, just
+    // reached by a real URL instead of a query param. Old ?area= links (ads,
+    // bookmarks, anything already shared) still work: redirect to the
+    // canonical route rather than rendering inline, so search engines see
+    // one URL per area, not two.
     const { area } = await searchParams;
-    return (
-      <Landing
-        area={
-          area === "immigration"
-            ? "immigration"
-            : area === "criminal"
-              ? "criminal_defense"
-              : area === "family"
-                ? "family_law"
-                : "personal_injury"
-        }
-      />
-    );
+    if (area === "immigration") redirect("/immigration");
+    if (area === "criminal") redirect("/criminal-defense");
+    if (area === "family") redirect("/family-law");
+    return <Landing area="personal_injury" />;
   }
   const { user, firm } = await requireFirmUser();
   const db = await getDb();
