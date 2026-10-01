@@ -5,7 +5,7 @@ import type { PracticeArea } from "@/lib/schema";
 // Public marketing page — what a logged-out visitor sees at the root.
 // Same Night Docket identity as the product; the pitch is the product.
 
-const CHANNELS = [
+export const CHANNELS = [
   { glyph: "VM", label: "Voicemail" },
   { glyph: "SMS", label: "Text" },
   { glyph: "WA", label: "WhatsApp" },
@@ -20,7 +20,7 @@ const HERO_CHECKLIST = [
   "Drafts the reply — a human approves every send",
 ];
 
-const HERO_STAGES = ["Captured", "Structured", "Verified", "Approved"];
+export const HERO_STAGES = ["Captured", "Structured", "Verified", "Approved"];
 
 const GUARANTEES = [
   { mark: "☑", text: "Nothing sends without a human clicking approve" },
@@ -29,7 +29,7 @@ const GUARANTEES = [
   { mark: "▤", text: "Every action lands in an append-only audit trail" },
 ];
 
-const PROBLEMS = [
+export const PROBLEMS = [
   {
     n: "01",
     title: "The call comes in at the worst time",
@@ -65,14 +65,14 @@ const CARDS = [
   },
 ];
 
-const PIPELINE = [
+export const PIPELINE = [
   { n: "01", title: "Capture", body: "Every channel lands in one desk — voicemail, text, WhatsApp, email, the web form." },
   { n: "02", title: "Structure", body: "The raw message becomes a case file: injuries, treatment status, liability, priority score." },
   { n: "03", title: "Verify", body: "Checked against your conflict list and the reviewed deadline table — never guessed by the AI." },
   { n: "04", title: "Approve & send", body: "A person at your firm reviews the drafted reply, edits if needed, and clicks send." },
 ];
 
-const SEGMENTS = [
+export const SEGMENTS = [
   {
     title: "Solo practitioners",
     body: "Capture every after-hours call without hiring overnight staff — the desk runs while you're in court or asleep.",
@@ -87,7 +87,7 @@ const SEGMENTS = [
   },
 ];
 
-const STEPS = [
+export const STEPS = [
   {
     n: "01",
     title: "Sign up",
@@ -417,13 +417,13 @@ const AREA_COPY: Record<PracticeArea, AreaCopy> = {
 };
 
 const AREA_TABS: { area: PracticeArea; label: string; href: string }[] = [
-  { area: "personal_injury", label: "Personal injury", href: "/" },
+  { area: "personal_injury", label: "Personal injury", href: "/personal-injury" },
   { area: "immigration", label: "Immigration", href: "/immigration" },
   { area: "criminal_defense", label: "Criminal defense", href: "/criminal-defense" },
   { area: "family_law", label: "Family law", href: "/family-law" },
 ];
 
-function Section({
+export function Section({
   id,
   className = "",
   children,
@@ -439,11 +439,11 @@ function Section({
   );
 }
 
-function Eyebrow({ children }: { children: React.ReactNode }) {
+export function Eyebrow({ children }: { children: React.ReactNode }) {
   return <div className="field-label text-manila mb-3">{children}</div>;
 }
 
-function Foot() {
+export function Foot() {
   return (
     <footer className="border-t border-ink-line px-6 py-6 flex flex-wrap items-center justify-between gap-4 text-sm text-dim">
       <span className="font-mono">
@@ -470,39 +470,46 @@ function Foot() {
   );
 }
 
+/** Shared by every public marketing page (the overview homepage and each practice-area page). The logo links to "/" — the overview — from anywhere. */
+export function Header() {
+  return (
+    <header className="flex items-center justify-between px-6 py-4 gap-4">
+      <Link href="/" className="flex items-center gap-3 shrink-0">
+        <span className="grid place-items-center w-9 h-9 rounded-sm border-2 border-meter text-meter font-display font-bold text-lg">
+          N
+        </span>
+        <span className="font-display font-bold text-xl uppercase tracking-widest text-paper">
+          Nightshift
+        </span>
+      </Link>
+      <nav className="hidden md:flex items-center gap-6" aria-label="Page sections">
+        <a href="#how-it-works" className="field-label text-dim hover:text-inktext">
+          How it works
+        </a>
+        <a href="#faq" className="field-label text-dim hover:text-inktext">
+          FAQ
+        </a>
+      </nav>
+      <span className="flex items-center gap-4 shrink-0">
+        <Link href="/login" className="field-label text-dim hover:text-inktext">
+          Sign in
+        </Link>
+        <Link
+          href="/signup"
+          className="rounded-sm bg-manila text-papertext font-display font-bold uppercase tracking-wider px-4 py-2 hover:bg-manila-deep"
+        >
+          Start free
+        </Link>
+      </span>
+    </header>
+  );
+}
+
 export default function Landing({ area = "personal_injury" }: { area?: PracticeArea }) {
   const copy = AREA_COPY[area];
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="flex items-center justify-between px-6 py-4 gap-4">
-        <span className="flex items-center gap-3 shrink-0">
-          <span className="grid place-items-center w-9 h-9 rounded-sm border-2 border-meter text-meter font-display font-bold text-lg">
-            N
-          </span>
-          <span className="font-display font-bold text-xl uppercase tracking-widest text-paper">
-            Nightshift
-          </span>
-        </span>
-        <nav className="hidden md:flex items-center gap-6" aria-label="Page sections">
-          <a href="#how-it-works" className="field-label text-dim hover:text-inktext">
-            How it works
-          </a>
-          <a href="#faq" className="field-label text-dim hover:text-inktext">
-            FAQ
-          </a>
-        </nav>
-        <span className="flex items-center gap-4 shrink-0">
-          <Link href="/login" className="field-label text-dim hover:text-inktext">
-            Sign in
-          </Link>
-          <Link
-            href="/signup"
-            className="rounded-sm bg-manila text-papertext font-display font-bold uppercase tracking-wider px-4 py-2 hover:bg-manila-deep"
-          >
-            Start free
-          </Link>
-        </span>
-      </header>
+      <Header />
 
       <main className="flex-1">
         {/* Hero */}
