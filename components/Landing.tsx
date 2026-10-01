@@ -416,7 +416,7 @@ const AREA_COPY: Record<PracticeArea, AreaCopy> = {
   },
 };
 
-const AREA_TABS: { area: PracticeArea; label: string; href: string }[] = [
+export const AREA_TABS: { area: PracticeArea; label: string; href: string }[] = [
   { area: "personal_injury", label: "Personal injury", href: "/personal-injury" },
   { area: "immigration", label: "Immigration", href: "/immigration" },
   { area: "criminal_defense", label: "Criminal defense", href: "/criminal-defense" },
