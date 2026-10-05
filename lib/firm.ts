@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { getDb, tables } from "./db";
 import type { FirmRow } from "./db/schema";
 import { DEFAULT_PRACTICE_LINE } from "./labels";
@@ -27,6 +27,62 @@ export async function updateFirm(
 ): Promise<void> {
   const db = await getDb();
   await db.update(tables.firms).set(patch).where(eq(tables.firms.id, firmId));
+}
+
+export interface DeletedFirmCounts {
+  users: number;
+  leads: number;
+  messages: number;
+  leadNotes: number;
+  auditEvents: number;
+  adverseParties: number;
+}
+
+/**
+ * Deletes a firm and everything it owns. No FK cascades exist anywhere in
+ * this schema (every `pgTable` here is a plain table — see lib/db/schema.ts),
+ * so this is the one place that has to remember every firm-owned table, in
+ * an order that leaves nothing orphaned. Irreversible, and makes no judgment
+ * about whether it SHOULD happen — billing cleanup and the "are you sure"
+ * confirmation are the caller's job (see app/operator/page.tsx, the only
+ * caller, gated to platform operators).
+ */
+export async function deleteFirmCascade(firmId: number): Promise<DeletedFirmCounts> {
+  const db = await getDb();
+
+  const userIds = (
+    await db.select({ id: tables.users.id }).from(tables.users).where(eq(tables.users.firmId, firmId))
+  ).map((r) => r.id);
+  if (userIds.length > 0) {
+    // Keyed by userId, not firmId — sessions/authTokens have no firm column.
+    await db.delete(tables.sessions).where(inArray(tables.sessions.userId, userIds));
+    await db.delete(tables.authTokens).where(inArray(tables.authTokens.userId, userIds));
+  }
+
+  const messages = (
+    await db.delete(tables.messages).where(eq(tables.messages.firmId, firmId)).returning({ id: tables.messages.id })
+  ).length;
+  const leadNotes = (
+    await db.delete(tables.leadNotes).where(eq(tables.leadNotes.firmId, firmId)).returning({ id: tables.leadNotes.id })
+  ).length;
+  const auditEvents = (
+    await db.delete(tables.auditEvents).where(eq(tables.auditEvents.firmId, firmId)).returning({ id: tables.auditEvents.id })
+  ).length;
+  const adverseParties = (
+    await db
+      .delete(tables.adverseParties)
+      .where(eq(tables.adverseParties.firmId, firmId))
+      .returning({ id: tables.adverseParties.id })
+  ).length;
+  const leads = (
+    await db.delete(tables.leads).where(eq(tables.leads.firmId, firmId)).returning({ id: tables.leads.id })
+  ).length;
+  const users = (
+    await db.delete(tables.users).where(eq(tables.users.firmId, firmId)).returning({ id: tables.users.id })
+  ).length;
+  await db.delete(tables.firms).where(eq(tables.firms.id, firmId));
+
+  return { users, leads, messages, leadNotes, auditEvents, adverseParties };
 }
 
 function slugify(name: string): string {

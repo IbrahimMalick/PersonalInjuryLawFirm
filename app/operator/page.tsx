@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache";
 import AppShell from "@/components/product/AppShell";
 import { audit } from "@/lib/audit";
 import { isOperator, requireFirmUser } from "@/lib/auth";
-import { billingEnabled, firmBillingState } from "@/lib/billing";
+import { billingEnabled, firmBillingState, getStripe } from "@/lib/billing";
 import { getDb, tables } from "@/lib/db";
 import type { FirmRow } from "@/lib/db/schema";
+import { deleteFirmCascade } from "@/lib/firm";
 import { DEFAULT_PRACTICE_LINE, PRACTICE_AREA_LABEL } from "@/lib/labels";
 import { isDemo } from "@/lib/mode";
 import { PRACTICE_AREAS, type PracticeArea } from "@/lib/schema";
@@ -99,6 +100,60 @@ async function setPracticeArea(formData: FormData): Promise<void> {
   revalidatePath("/operator");
 }
 
+/**
+ * Irreversibly removes a firm and everything it owns — leads, users,
+ * messages, notes, conflict list, its own audit trail. No FK cascades exist
+ * in this schema (every table is deleted deliberately, in app code, here),
+ * so this is the one place that has to remember every firm-owned table.
+ * Gated on typing the firm's exact slug back — the one click a stray tap
+ * can't reach. Platform-only (isOperator), same as every other action here.
+ */
+async function deleteFirm(formData: FormData): Promise<void> {
+  "use server";
+  const { user } = await requireFirmUser();
+  if (!isOperator(user)) redirect("/");
+  const firmId = Number(formData.get("firmId"));
+  const confirmSlug = String(formData.get("confirmSlug") ?? "").trim();
+
+  const db = await getDb();
+  const target = (
+    await db.select().from(tables.firms).where(eq(tables.firms.id, firmId)).limit(1)
+  )[0];
+  if (!target) redirect("/operator");
+  if (confirmSlug !== target.slug) {
+    redirect(`/operator?deleteError=${firmId}`);
+  }
+
+  // Best-effort — stop future billing before the subscription id is gone for
+  // good. A Stripe hiccup (or an already-canceled subscription) must never
+  // block the delete itself; the firm disappearing is the thing that matters.
+  if (billingEnabled() && target.stripeSubscriptionId) {
+    try {
+      await getStripe().subscriptions.cancel(target.stripeSubscriptionId);
+    } catch {
+      // already canceled, or Stripe is unreachable — proceed with the delete regardless
+    }
+  }
+
+  const counts = await deleteFirmCascade(firmId);
+
+  // The firm's own audit trail just went with it — this is the one record
+  // that survives, filed as a platform-level event (firmId: null) rather than
+  // under the firm that no longer exists.
+  await audit("operator.firm_deleted", {
+    firmId: null,
+    userId: user.id,
+    detail: {
+      deletedFirmId: firmId,
+      name: target.name,
+      slug: target.slug,
+      practiceArea: target.practiceArea,
+      ...counts,
+    },
+  });
+  revalidatePath("/operator");
+}
+
 async function setTrial(formData: FormData): Promise<void> {
   "use server";
   const { user } = await requireFirmUser();
@@ -132,8 +187,13 @@ async function setTrial(formData: FormData): Promise<void> {
   revalidatePath("/operator");
 }
 
-export default async function OperatorConsole() {
+export default async function OperatorConsole({
+  searchParams,
+}: {
+  searchParams: Promise<{ deleteError?: string }>;
+}) {
   if (isDemo()) redirect("/demo");
+  const { deleteError } = await searchParams;
   const { user, firm } = await requireFirmUser();
   if (!isOperator(user)) redirect("/");
 
@@ -185,6 +245,7 @@ export default async function OperatorConsole() {
             if (!f.twilioNumber) onboarding.push("phone");
             if (!(usersBy[f.id] > 1)) onboarding.push("team");
             const billing = billingLabel(f);
+            const isPaying = firmBillingState(f).kind === "active";
             return (
               <div
                 key={f.id}
@@ -262,6 +323,33 @@ export default async function OperatorConsole() {
                   <button className="field-label text-manila hover:text-meter shrink-0">Set</button>
                   <span className="text-xs text-dim">
                     Changing it resets the attorney&apos;s deadline-table acknowledgment.
+                  </span>
+                </form>
+
+                {deleteError === String(f.id) && (
+                  <p className="text-stamp text-sm border-t border-stamp/40 bg-stamp/5 px-4 py-2">
+                    Typed text didn&apos;t match the slug — nothing was deleted.
+                  </p>
+                )}
+                <form
+                  action={deleteFirm}
+                  className="flex flex-wrap items-center gap-2 border-t border-stamp/40 bg-stamp/5 px-4 py-2.5"
+                >
+                  <input type="hidden" name="firmId" value={f.id} />
+                  <span className="field-label text-stamp shrink-0">Delete firm</span>
+                  <input
+                    name="confirmSlug"
+                    placeholder={`type "${f.slug}" to confirm`}
+                    className="rounded-sm border border-stamp/50 bg-ink px-2 py-1 text-sm font-mono text-inktext placeholder:text-dim focus:outline focus:outline-2 focus:outline-stamp"
+                    aria-label={`Type ${f.slug} to confirm deleting ${f.name}`}
+                  />
+                  <button className="field-label text-stamp border border-stamp/50 rounded-sm px-3 py-1 hover:bg-stamp/20 shrink-0">
+                    Permanently delete
+                  </button>
+                  <span className="text-xs text-dim">
+                    Deletes {leadsBy[f.id] ?? 0} leads, {usersBy[f.id] ?? 0} users, {partiesBy[f.id] ?? 0} conflict
+                    entries, and the firm itself — no undo.
+                    {isPaying ? " This firm has an active paid subscription." : ""}
                   </span>
                 </form>
 
