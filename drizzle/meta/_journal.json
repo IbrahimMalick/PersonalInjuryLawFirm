@@ -43,6 +43,13 @@
       "when": 1790822048893,
       "tag": "0005_pink_dracula",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791212636173,
+      "tag": "0006_numerous_mad_thinker",
+      "breakpoints": true
     }
   ]
 }

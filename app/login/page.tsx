@@ -2,7 +2,8 @@ import { eq } from "drizzle-orm";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { audit } from "@/lib/audit";
-import { createSession, verifyPassword } from "@/lib/auth";
+import { createSession, setTwoFactorChallengeCookie, verifyPassword } from "@/lib/auth";
+import { issueToken } from "@/lib/auth-tokens";
 import { getDb, tables } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,16 @@ async function login(formData: FormData): Promise<void> {
     await audit("login.failed", { firmId: user?.firmId ?? null, detail: { email } });
     redirect("/login?error=1");
   }
+
+  if (user.totpEnabledAt) {
+    // Password alone isn't a login yet — hand off to the 2FA step. No
+    // session exists until that code checks out too.
+    const challenge = await issueToken(user.id, "two_factor_challenge");
+    await setTwoFactorChallengeCookie(challenge);
+    await audit("login.2fa_challenge_sent", { firmId: user.firmId, userId: user.id });
+    redirect("/login/2fa");
+  }
+
   await audit("login.succeeded", { firmId: user.firmId, userId: user.id });
   await createSession(user.id);
   redirect("/");
@@ -52,10 +63,16 @@ export default async function LoginPage({
           </h1>
           <p className="field-label text-dim mt-1">Intake desk · sign in</p>
         </div>
-        {error && (
+        {error === "2fa_expired" ? (
           <p className="text-stamp text-sm border border-stamp/50 rounded-sm px-3 py-2">
-            That email and password don&apos;t match an active account.
+            That two-factor step timed out — sign in again.
           </p>
+        ) : (
+          error && (
+            <p className="text-stamp text-sm border border-stamp/50 rounded-sm px-3 py-2">
+              That email and password don&apos;t match an active account.
+            </p>
+          )
         )}
         {reset && (
           <p className="text-ok text-sm border border-ok/50 rounded-sm px-3 py-2">

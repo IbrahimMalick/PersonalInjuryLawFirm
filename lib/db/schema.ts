@@ -73,6 +73,13 @@ export const users = pgTable(
     role: text("role", { enum: ["admin", "reviewer"] }).notNull().default("reviewer"),
     emailVerifiedAt: text("email_verified_at"),
     disabledAt: text("disabled_at"),
+    // Two-factor (TOTP). totpSecret is set as soon as enrollment starts but
+    // totpEnabledAt stays null — and login never asks for a code — until the
+    // user has entered one correct code back, proving their app is actually
+    // set up. totpBackupCodes holds bcrypt hashes, never the plaintext.
+    totpSecret: text("totp_secret"),
+    totpEnabledAt: text("totp_enabled_at"),
+    totpBackupCodes: jsonb("totp_backup_codes").$type<string[]>(),
     createdAt: text("created_at").notNull().$defaultFn(nowIso),
   },
   (t) => [uniqueIndex("users_email_idx").on(t.email), index("users_firm_idx").on(t.firmId)]
@@ -89,13 +96,19 @@ export const sessions = pgTable(
   (t) => [index("sessions_user_idx").on(t.userId)]
 );
 
-// One-time tokens for email verification and password reset.
+// One-time tokens: email verification, password reset, and the short-lived
+// handoff between "password verified" and "2FA code verified" at login.
+// two_factor_challenge is the one exception to "one-time" in the literal
+// sense — a wrong code doesn't burn it, so the real device can still be
+// tried again before it expires; see lib/auth-tokens.ts peekToken/redeemToken.
 export const authTokens = pgTable(
   "auth_tokens",
   {
     token: text("token").primaryKey(),
     userId: integer("user_id").notNull(),
-    purpose: text("purpose", { enum: ["verify_email", "reset_password"] }).notNull(),
+    purpose: text("purpose", {
+      enum: ["verify_email", "reset_password", "two_factor_challenge"],
+    }).notNull(),
     expiresAt: text("expires_at").notNull(),
     usedAt: text("used_at"),
     createdAt: text("created_at").notNull().$defaultFn(nowIso),

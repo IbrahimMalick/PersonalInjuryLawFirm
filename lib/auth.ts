@@ -8,6 +8,19 @@ import type { UserRow } from "./db/schema";
 
 const SESSION_COOKIE = "ns_session";
 const SESSION_DAYS = 30;
+const TWOFA_CHALLENGE_COOKIE = "ns_2fa_challenge";
+const TWOFA_CHALLENGE_MINUTES = 10; // matches the two_factor_challenge token's own TTL
+const NEW_BACKUP_CODES_COOKIE = "ns_2fa_new_codes";
+
+function cookieOpts(maxAgeSeconds: number, path = "/"): Parameters<Awaited<ReturnType<typeof cookies>>["set"]>[2] {
+  return {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production" && process.env.INSECURE_COOKIES !== "true",
+    maxAge: maxAgeSeconds,
+    path,
+  };
+}
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 12);
@@ -47,6 +60,52 @@ export async function destroySession(): Promise<void> {
     await db.delete(tables.sessions).where(eq(tables.sessions.token, token));
   }
   jar.delete(SESSION_COOKIE);
+}
+
+// ── Two-factor login handoff ─────────────────────────────────────────────────
+// Between "password checked out" and "code checked out" there is no session
+// yet — just this short-lived cookie naming the pending auth_tokens challenge
+// (lib/auth-tokens.ts). Separate cookie from the real session on purpose: a
+// half-finished login should never look like one to currentUser().
+
+export async function setTwoFactorChallengeCookie(token: string): Promise<void> {
+  const jar = await cookies();
+  jar.set(TWOFA_CHALLENGE_COOKIE, token, cookieOpts(TWOFA_CHALLENGE_MINUTES * 60));
+}
+
+export async function getTwoFactorChallengeCookie(): Promise<string | null> {
+  const jar = await cookies();
+  return jar.get(TWOFA_CHALLENGE_COOKIE)?.value ?? null;
+}
+
+export async function clearTwoFactorChallengeCookie(): Promise<void> {
+  const jar = await cookies();
+  jar.delete(TWOFA_CHALLENGE_COOKIE);
+}
+
+// ── Backup codes, shown exactly once ─────────────────────────────────────────
+// Only the plaintext ever touches this cookie, right after enrollment — the
+// database only ever stores the bcrypt hashes. A short self-expiry is just
+// hygiene on top of the explicit dismiss button on /settings/security.
+
+export async function setNewBackupCodesCookie(codes: string[]): Promise<void> {
+  const jar = await cookies();
+  // Default path ("/"), matching every other cookie here — deleting a cookie
+  // set on a narrower path requires repeating that exact path, and getting
+  // that wrong silently leaves the old cookie in place (found by testing
+  // this: the "shown once" banner kept reappearing after being dismissed).
+  jar.set(NEW_BACKUP_CODES_COOKIE, codes.join(","), cookieOpts(300));
+}
+
+export async function peekNewBackupCodesCookie(): Promise<string[] | null> {
+  const jar = await cookies();
+  const raw = jar.get(NEW_BACKUP_CODES_COOKIE)?.value;
+  return raw ? raw.split(",") : null;
+}
+
+export async function clearNewBackupCodesCookie(): Promise<void> {
+  const jar = await cookies();
+  jar.delete(NEW_BACKUP_CODES_COOKIE);
 }
 
 export async function currentUser(): Promise<UserRow | null> {

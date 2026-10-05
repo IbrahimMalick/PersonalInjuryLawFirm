@@ -60,6 +60,35 @@ async function addUser(formData: FormData): Promise<void> {
   revalidatePath("/settings");
 }
 
+async function resetUserTwoFactor(formData: FormData): Promise<void> {
+  "use server";
+  const { user: admin, firm } = await requireFirmUser("admin");
+  const targetId = Number(formData.get("userId"));
+  const db = await getDb();
+  const target = (
+    await db
+      .select({ id: tables.users.id, firmId: tables.users.firmId })
+      .from(tables.users)
+      .where(eq(tables.users.id, targetId))
+      .limit(1)
+  )[0];
+  if (!target || target.firmId !== firm.id) redirect("/settings");
+
+  await db
+    .update(tables.users)
+    .set({ totpSecret: null, totpEnabledAt: null, totpBackupCodes: null })
+    .where(eq(tables.users.id, targetId));
+  // Recorded under the admin who did it, not the account it happened to —
+  // this is a trust override (bypasses the account's own password + code
+  // check in app/settings/security/page.tsx), so who authorized it matters.
+  await audit("settings.2fa_reset_by_admin", {
+    firmId: firm.id,
+    userId: admin.id,
+    detail: { targetUserId: targetId },
+  });
+  revalidatePath("/settings");
+}
+
 export default async function SettingsPage({
   searchParams,
 }: {
@@ -185,13 +214,31 @@ export default async function SettingsPage({
             {/* Users */}
             <div className={card}>
               <h2 className={h2}>Users</h2>
-              <div className="font-mono text-sm space-y-1 pb-3">
+              <div className="font-mono text-sm space-y-1.5 pb-3">
                 {users.map((u) => (
-                  <div key={u.id} className="flex justify-between">
-                    <span>
+                  <div key={u.id} className="flex items-center justify-between gap-2">
+                    <span className="truncate">
                       {u.name} · {u.email}
                     </span>
-                    <span className="text-dim">{u.role}</span>
+                    <span className="flex items-center gap-2 shrink-0">
+                      <span className="text-dim">{u.role}</span>
+                      {u.totpEnabledAt ? (
+                        <span className="field-label text-ok">2FA</span>
+                      ) : (
+                        <span className="field-label text-dim">no 2FA</span>
+                      )}
+                      {u.totpSecret && u.id !== user.id && (
+                        <form action={resetUserTwoFactor}>
+                          <input type="hidden" name="userId" value={u.id} />
+                          <button
+                            className="field-label text-dim hover:text-stamp"
+                            title="Clear this person's 2FA — use if they've lost their device and backup codes"
+                          >
+                            reset 2FA
+                          </button>
+                        </form>
+                      )}
+                    </span>
                   </div>
                 ))}
               </div>
