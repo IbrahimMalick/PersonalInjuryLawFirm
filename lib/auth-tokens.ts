@@ -4,14 +4,14 @@ import { getDb, tables } from "./db";
 import { baseUrl, sendPlatformEmail } from "./email";
 import type { UserRow } from "./db/schema";
 
-// One-time tokens for email verification and password reset.
+// One-time tokens for email verification, password reset, and the short-lived
+// handoff between "password verified" and "2FA code verified" at login.
 
-const TTL_HOURS = { verify_email: 72, reset_password: 2 } as const;
+export type TokenPurpose = "verify_email" | "reset_password" | "two_factor_challenge";
 
-export async function issueToken(
-  userId: number,
-  purpose: "verify_email" | "reset_password"
-): Promise<string> {
+const TTL_HOURS = { verify_email: 72, reset_password: 2, two_factor_challenge: 1 / 6 } as const; // 10 minutes
+
+export async function issueToken(userId: number, purpose: TokenPurpose): Promise<string> {
   const db = await getDb();
   const token = crypto.randomBytes(32).toString("base64url");
   await db.insert(tables.authTokens).values({
@@ -24,10 +24,7 @@ export async function issueToken(
 }
 
 /** Redeem a token exactly once. Returns the user id, or null. */
-export async function redeemToken(
-  token: string,
-  purpose: "verify_email" | "reset_password"
-): Promise<number | null> {
+export async function redeemToken(token: string, purpose: TokenPurpose): Promise<number | null> {
   const db = await getDb();
   const rows = await db
     .update(tables.authTokens)
@@ -41,6 +38,29 @@ export async function redeemToken(
       )
     )
     .returning({ userId: tables.authTokens.userId });
+  return rows[0]?.userId ?? null;
+}
+
+/**
+ * Look up a token WITHOUT consuming it — unlike email/reset links, a 2FA
+ * challenge has to survive a wrong first guess, so the login page needs to
+ * read who it belongs to before knowing whether to burn it. Call
+ * redeemToken() separately once the code actually checks out.
+ */
+export async function peekToken(token: string, purpose: TokenPurpose): Promise<number | null> {
+  const db = await getDb();
+  const rows = await db
+    .select({ userId: tables.authTokens.userId })
+    .from(tables.authTokens)
+    .where(
+      and(
+        eq(tables.authTokens.token, token),
+        eq(tables.authTokens.purpose, purpose),
+        isNull(tables.authTokens.usedAt),
+        gt(tables.authTokens.expiresAt, new Date().toISOString())
+      )
+    )
+    .limit(1);
   return rows[0]?.userId ?? null;
 }
 

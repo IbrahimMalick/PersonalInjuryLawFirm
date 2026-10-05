@@ -145,6 +145,9 @@ export default async function AppShell({
         <span className="font-mono text-xs text-dim">
           {user.name} · {user.role}
         </span>
+        <Link href="/settings/security" className="field-label text-dim hover:text-manila">
+          Security
+        </Link>
         <form action={logout}>
           <button className="field-label text-dim hover:text-stamp" type="submit">
             Sign out
