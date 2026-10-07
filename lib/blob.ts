@@ -10,22 +10,22 @@ import { put } from "@vercel/blob";
 
 const MAX_FILES = 5;
 const MAX_BYTES = 8 * 1024 * 1024; // 8 MB per file
-const ALLOWED_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/heic",
-  "image/heif",
-  "application/pdf",
-]);
+// The allowed types, and the extension each is actually stored under — never
+// the uploaded filename's own extension. The browser sets `file.type` from
+// what the client declares, not real content sniffing; without this, a part
+// declaring Content-Type: image/png but named x.html would pass validation
+// and still get stored as "<uuid>.html", publicly, under access: "public".
+const EXT_FOR_TYPE: Record<string, string> = {
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/webp": ".webp",
+  "image/heic": ".heic",
+  "image/heif": ".heif",
+  "application/pdf": ".pdf",
+};
 
 export function blobConfigured(): boolean {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
-}
-
-function safeExt(name: string): string {
-  const m = /\.[a-zA-Z0-9]{1,5}$/.exec(name);
-  return m ? m[0].toLowerCase() : "";
 }
 
 export interface UploadResult {
@@ -43,12 +43,13 @@ export async function uploadAttachments(files: File[], pathPrefix: string): Prom
   let skipped = Math.max(0, files.length - MAX_FILES);
 
   for (const file of files.slice(0, MAX_FILES)) {
-    if (file.size === 0 || file.size > MAX_BYTES || !ALLOWED_TYPES.has(file.type)) {
+    const ext = EXT_FOR_TYPE[file.type];
+    if (file.size === 0 || file.size > MAX_BYTES || !ext) {
       skipped++;
       continue;
     }
     try {
-      const key = `${pathPrefix}/${crypto.randomUUID()}${safeExt(file.name)}`;
+      const key = `${pathPrefix}/${crypto.randomUUID()}${ext}`;
       const blob = await put(key, file, { access: "public", addRandomSuffix: false });
       urls.push(blob.url);
     } catch (e) {

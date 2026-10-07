@@ -184,6 +184,33 @@ describe("resolveReplyDestination", () => {
     const out = { ...validOutput, claimant: { ...validOutput.claimant, phone: null, email: null } };
     expect(resolveReplyDestination(lead("webform", "webform"), out as never)).toBeNull();
   });
+
+  describe("mismatch flag — extracted contact vs. the channel's own verified address", () => {
+    it("flags it when a voicemail's spoken callback number differs from caller ID", () => {
+      // validOutput.claimant.phone is "(347) 555-0100" — a different number.
+      const d = resolveReplyDestination(lead("voicemail", "+13475550999"), validOutput as never);
+      expect(d?.mismatch).toBe(true);
+    });
+    it("does not flag it when the extracted phone is just a reformatted caller ID", () => {
+      const d = resolveReplyDestination(lead("sms", "+13475550100"), validOutput as never);
+      expect(d?.mismatch).toBe(false); // same number as "(347) 555-0100", different formatting
+    });
+    it("does not flag it when there's nothing verified to compare against (pure fallback)", () => {
+      const out = { ...validOutput, claimant: { ...validOutput.claimant, phone: null } };
+      const d = resolveReplyDestination(lead("sms", "+13475550999"), out as never); // falls back to caller ID itself
+      expect(d?.mismatch).toBe(false);
+    });
+    it("flags an email reply whose extracted address differs from the verified sender", () => {
+      const out = { ...validOutput, claimant: { ...validOutput.claimant, email: "attacker@evil.test" } };
+      const d = resolveReplyDestination(lead("email", "real-sender@client.test"), out as never);
+      expect(d?.mismatch).toBe(true);
+    });
+    it("does not flag an email reply that matches the sender case-insensitively", () => {
+      const out = { ...validOutput, claimant: { ...validOutput.claimant, email: "Jane@Client.test" } };
+      const d = resolveReplyDestination(lead("email", "jane@client.test"), out as never);
+      expect(d?.mismatch).toBe(false);
+    });
+  });
 });
 
 describe("firmBillingState", async () => {

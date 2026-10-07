@@ -8,7 +8,7 @@ get the `/operator` console for onboarding and phone-number provisioning.
 
 **Recommended: Vercel + Neon Postgres — the click-by-click guide is
 [DEPLOY-VERCEL.md](DEPLOY-VERCEL.md).** Jobs run serverlessly there: work is
-drained right after each response, with a minutely cron sweeper
+drained right after each response, with a cron sweeper every 10 minutes
 (`/api/jobs/run`, `CRON_SECRET`) as the retry safety net.
 
 Storage is Postgres behind Drizzle. Set `DATABASE_URL` to any standard

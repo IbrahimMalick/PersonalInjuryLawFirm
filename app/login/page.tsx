@@ -1,15 +1,26 @@
 import { eq } from "drizzle-orm";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { audit } from "@/lib/audit";
 import { createSession, setTwoFactorChallengeCookie, verifyPassword } from "@/lib/auth";
 import { issueToken } from "@/lib/auth-tokens";
 import { getDb, tables } from "@/lib/db";
+import { rateLimited } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 async function login(formData: FormData): Promise<void> {
   "use server";
+  const hdrs = await headers();
+  const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  // Scoped by IP: bounds how many passwords one source can try, against
+  // this account or any other — the "credential stuffing" case the audit
+  // flagged as unlimited. A targeted attack against one account from many
+  // IPs isn't something a request-count limiter can stop; that's what the
+  // account's own password strength and 2FA are for.
+  if (await rateLimited(`login:${ip}`, 10, 3_600_000)) redirect("/login?error=rate");
+
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const db = await getDb();
@@ -66,6 +77,10 @@ export default async function LoginPage({
         {error === "2fa_expired" ? (
           <p className="text-stamp text-sm border border-stamp/50 rounded-sm px-3 py-2">
             That two-factor step timed out — sign in again.
+          </p>
+        ) : error === "rate" ? (
+          <p className="text-stamp text-sm border border-stamp/50 rounded-sm px-3 py-2">
+            Too many attempts from this connection. Try again in an hour.
           </p>
         ) : (
           error && (

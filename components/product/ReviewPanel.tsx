@@ -14,6 +14,12 @@ interface Props {
   firm: { name: string; practiceLine: string; addressLine: string; phone: string };
   headerNote: string; // "Draft reply — Voicemail · English"
   destination: string | null; // "Text message to (347) 555-0119" or null
+  // True when `destination` comes from the model's extracted contact info
+  // AND it disagrees with this channel's own verified address (caller ID,
+  // the parsed email sender). That's exactly the shape of a prompt-injection
+  // attempt to redirect a reply — a lead's free text asking to be reached
+  // somewhere other than where it actually came from.
+  destinationMismatch?: boolean;
   conflict: boolean;
   isAdmin: boolean;
   sent: { status: string; at: string | null; to: string } | null;
@@ -74,6 +80,12 @@ export default function ReviewPanel(props: Props) {
           <span>{props.headerNote}</span>
           {props.destination && <span className="text-right">{props.destination}</span>}
         </div>
+        {props.destinationMismatch && (
+          <p className="field-label text-stamp pb-3 -mt-2">
+            ⚠ Differs from this lead&apos;s verified sender — the message asked to be reached
+            somewhere else. Confirm before sending.
+          </p>
+        )}
 
         {props.sent ? (
           <div className="text-[15.5px] leading-relaxed whitespace-pre-line">{props.initialDraft}</div>

@@ -10,6 +10,7 @@ import {
 } from "@/lib/auth";
 import { peekToken, redeemToken } from "@/lib/auth-tokens";
 import { getDb, tables } from "@/lib/db";
+import { rateLimited } from "@/lib/rate-limit";
 import { consumeBackupCode, verifyTotp } from "@/lib/totp";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +38,17 @@ async function verifyCode(formData: FormData): Promise<void> {
   if (!user || !user.totpSecret || !user.totpEnabledAt) {
     await clearTwoFactorChallengeCookie();
     redirect("/login");
+  }
+
+  // Scoped by userId, not the (single-use-ish) challenge token: a fresh
+  // password check issues a fresh challenge, so limiting by token alone
+  // would let an attacker just restart the password step to reset their
+  // guess budget. A 6-digit code is ~1M combinations — unlimited guessing
+  // made that fully parallelisable; this makes brute-forcing infeasible
+  // without touching how a slow, honest typist re-tries their own code.
+  if (await rateLimited(`2fa-code:${userId}`, 10, 3_600_000)) {
+    await audit("login.2fa_rate_limited", { firmId: user.firmId, userId: user.id });
+    redirect("/login/2fa?error=rate");
   }
 
   if (verifyTotp(user.totpSecret, code)) {
@@ -98,10 +110,16 @@ export default async function TwoFactorPage({
           </h1>
           <p className="field-label text-dim mt-1">From your authenticator app</p>
         </div>
-        {error && (
+        {error === "rate" ? (
           <p className="text-stamp text-sm border border-stamp/50 rounded-sm px-3 py-2">
-            That code didn&apos;t match — try again, or use a backup code.
+            Too many attempts — try again in an hour, or sign in again to start over.
           </p>
+        ) : (
+          error && (
+            <p className="text-stamp text-sm border border-stamp/50 rounded-sm px-3 py-2">
+              That code didn&apos;t match — try again, or use a backup code.
+            </p>
+          )
         )}
         <label className="block">
           <span className="field-label text-dim">6-digit code or backup code</span>

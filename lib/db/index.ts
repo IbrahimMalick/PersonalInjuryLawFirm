@@ -20,12 +20,39 @@ async function create(): Promise<{ db: AnyDb; migrate: () => Promise<void> }> {
   const migrationsFolder = path.join(process.cwd(), "drizzle");
 
   if (url) {
-    const { Pool } = await import("pg");
+    const { Client, Pool } = await import("pg");
     const { drizzle } = await import("drizzle-orm/node-postgres");
     const { migrate } = await import("drizzle-orm/node-postgres/migrator");
     const pool = new Pool({ connectionString: url, max: 5 });
     const db = drizzle(pool, { schema });
-    return { db, migrate: () => migrate(db, { migrationsFolder }) };
+    return {
+      db,
+      migrate: async () => {
+        // A fresh deploy can cold-start several serverless instances at
+        // once, each calling getDb() independently — without this, they'd
+        // all run the migrator concurrently against the same database and
+        // can collide applying the same pending migration, serving
+        // scattered 500s. A session-scoped advisory lock serializes them:
+        // whoever gets it runs the real migration; everyone else blocks,
+        // then finds nothing pending once they get their turn. The lock id
+        // is arbitrary — just needs to be the same constant every instance
+        // agrees on, and not used for anything else in this codebase.
+        //
+        // A dedicated Client, not a connection borrowed from `pool`: holding
+        // a pool connection for the lock while migrate() needs its own
+        // connection from that same (small, size-limited) pool risks the
+        // lock-holder starving the very migration it's supposed to gate.
+        const lockClient = new Client({ connectionString: url });
+        await lockClient.connect();
+        try {
+          await lockClient.query("SELECT pg_advisory_lock(727501001)");
+          await migrate(db, { migrationsFolder });
+        } finally {
+          await lockClient.query("SELECT pg_advisory_unlock(727501001)");
+          await lockClient.end();
+        }
+      },
+    };
   }
 
   const dataDir = process.env.PGLITE_DIR ?? path.join(process.cwd(), "data", "pg");
