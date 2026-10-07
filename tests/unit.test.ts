@@ -139,6 +139,20 @@ describe("buildCaseFile trust boundary", () => {
     const { caseFile } = buildCaseFile(validOutput, "", []);
     expect(caseFile.statuteOfLimitations.deadlineISO).toBe("2029-08-01");
   });
+  it("strips a stated deadline from scoreRationale and missingInfo, same as the other practice areas", () => {
+    const out: ModelOutput = {
+      ...validOutput,
+      scoreRationale: "Strong case. The SOL deadline is December 8, 2026.",
+      missingInfo: ["Police report number", "Do they know the SOL deadline is 1095 days out?"],
+    };
+    const { caseFile } = buildCaseFile(out, "", []);
+    expect(caseFile.scoreRationale).toBe("Strong case.");
+    expect(caseFile.missingInfo).toEqual(["Police report number"]);
+  });
+  it("never leaves scoreRationale empty when the whole sentence was a stated deadline", () => {
+    const out: ModelOutput = { ...validOutput, scoreRationale: "The SOL deadline is December 8, 2026." };
+    expect(buildCaseFile(out, "", []).caseFile.scoreRationale).toBe("See the message below.");
+  });
 });
 
 describe("resolveReplyDestination", () => {

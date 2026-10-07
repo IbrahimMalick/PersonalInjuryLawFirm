@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { conductRules, REVIEW_RULES } from "./guardrails";
 import { matchConflicts, type ConflictParty } from "./conflicts";
 import { computeSOL } from "./sol-table";
+import { stripStatedDeadlines } from "./deadline-guard";
 import { fallbackFor } from "./fallbacks";
 import { zModelOutput, type CaseFile, type Channel, type ModelOutput } from "./schema";
 
@@ -321,9 +322,13 @@ export function buildCaseFile(
     priorRepresentation: output.priorRepresentation,
     statuteOfLimitations,
     priorityScore: Math.round(output.priorityScore),
-    scoreRationale: output.scoreRationale,
+    // Free text is never allowed to carry a deadline past the acknowledgment
+    // gate — same rule immigration/family/criminal already apply; PI has its
+    // own acknowledgment gate (firm.solAcknowledgedAt) the model could leak
+    // past just as easily via scoreRationale/missingInfo.
+    scoreRationale: stripStatedDeadlines(output.scoreRationale) || "See the message below.",
     routing: output.routing,
-    missingInfo: output.missingInfo,
+    missingInfo: output.missingInfo.map(stripStatedDeadlines).filter(Boolean),
     conflictFlags,
     confidence: output.confidence,
     needsHumanReview,

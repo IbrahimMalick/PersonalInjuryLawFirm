@@ -47,6 +47,15 @@ async function cancelEnrollment(): Promise<void> {
   "use server";
   const { user } = await requireFirmUser();
   const db = await getDb();
+  const row = (await db.select().from(tables.users).where(eq(tables.users.id, user.id)).limit(1))[0];
+  // Only valid mid-enrollment (a secret set, but not yet confirmed). Without
+  // this check, calling this same action once 2FA is already enabled would
+  // turn it off with no password or code — unlike disableTwoFactor below,
+  // which requires both. A stolen session cookie alone could strip 2FA.
+  if (!row || row.totpEnabledAt) {
+    revalidatePath("/settings/security");
+    return;
+  }
   await db
     .update(tables.users)
     .set({ totpSecret: null, totpEnabledAt: null })
