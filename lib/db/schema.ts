@@ -215,6 +215,23 @@ export const jobs = pgTable(
   (t) => [index("jobs_pending_idx").on(t.status, t.runAt)]
 );
 
+// Shared, persistent rate limiting (see lib/rate-limit.ts). Deliberately a
+// plain table, not an in-memory Map: a module-scope Map only limits requests
+// landing on the SAME warm serverless instance, and on Vercel every cold
+// start gets a fresh, empty one — so an in-memory limiter never actually
+// binds once there's real concurrent traffic. `scope` is caller-defined
+// (e.g. "webform:<firmId>:<ip>", "signup:<ip>") so one table serves every
+// rate-limited endpoint.
+export const rateLimitHits = pgTable(
+  "rate_limit_hits",
+  {
+    id: serial("id").primaryKey(),
+    scope: text("scope").notNull(),
+    createdAt: text("created_at").notNull().$defaultFn(nowIso),
+  },
+  (t) => [index("rate_limit_hits_scope_idx").on(t.scope, t.createdAt)]
+);
+
 // Internal team notes on a lead — "called, left voicemail," that kind of
 // coordination. Separate from the audit trail: the audit trail is a system
 // record of what the app did; this is what a person chose to tell their

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { uploadAttachments } from "@/lib/blob";
 import { ingestLead } from "@/lib/channels/inbound";
 import { getFirmBySlug } from "@/lib/firm";
+import { rateLimited } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30; // room for a few file uploads
@@ -9,20 +10,8 @@ export const maxDuration = 30; // room for a few file uploads
 // Public endpoint for the hosted intake form and the embeddable snippet.
 // Spam defenses: honeypot field, minimum-fill-time check, per-IP rate limit.
 
-const rate = new Map<string, { count: number; windowStart: number }>();
 const WINDOW_MS = 60 * 60 * 1000;
 const MAX_PER_WINDOW = 10;
-
-function rateLimited(ip: string): boolean {
-  const now = Date.now();
-  const entry = rate.get(ip);
-  if (!entry || now - entry.windowStart > WINDOW_MS) {
-    rate.set(ip, { count: 1, windowStart: now });
-    return false;
-  }
-  entry.count++;
-  return entry.count > MAX_PER_WINDOW;
-}
 
 export async function POST(request: Request) {
   const url = new URL(request.url);
@@ -40,7 +29,7 @@ export async function POST(request: Request) {
       : NextResponse.json({ ok: true });
 
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (rateLimited(`${firm.id}:${ip}`)) {
+  if (await rateLimited(`webform:${firm.id}:${ip}`, MAX_PER_WINDOW, WINDOW_MS)) {
     return NextResponse.json({ error: "Too many submissions" }, { status: 429 });
   }
 
@@ -62,9 +51,11 @@ export async function POST(request: Request) {
   if (fields.website) {
     return done(); // pretend success; drop silently
   }
-  // Minimum fill time: the form stamps when it rendered.
+  // Minimum fill time: the form stamps when it rendered. A missing stamp is
+  // just as suspicious as a too-fast one — a bot posting directly to this
+  // endpoint simply omits the field rather than racing the clock.
   const renderedAt = Number(fields._renderedAt ?? 0);
-  if (renderedAt && Date.now() - renderedAt < 2000) {
+  if (!renderedAt || Date.now() - renderedAt < 2000) {
     return done();
   }
 
