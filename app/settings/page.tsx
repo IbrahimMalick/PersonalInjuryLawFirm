@@ -93,6 +93,38 @@ async function resetUserTwoFactor(formData: FormData): Promise<void> {
   revalidatePath("/settings");
 }
 
+async function toggleUserDisabled(formData: FormData): Promise<void> {
+  "use server";
+  const { user: admin, firm } = await requireFirmUser("admin");
+  const targetId = Number(formData.get("userId"));
+  if (targetId === admin.id) redirect("/settings"); // can't disable your own account
+  const db = await getDb();
+  const target = (
+    await db
+      .select({ id: tables.users.id, firmId: tables.users.firmId, disabledAt: tables.users.disabledAt })
+      .from(tables.users)
+      .where(eq(tables.users.id, targetId))
+      .limit(1)
+  )[0];
+  if (!target || target.firmId !== firm.id) redirect("/settings");
+
+  const nowDisabling = !target.disabledAt;
+  await db
+    .update(tables.users)
+    .set({ disabledAt: nowDisabling ? new Date().toISOString() : null })
+    .where(eq(tables.users.id, targetId));
+  // Takes effect on the account's very next request, not just its next
+  // login: currentUser() (lib/auth.ts) re-checks disabledAt on every request,
+  // so an already-open session is cut off immediately — no separate session
+  // cleanup needed.
+  await audit(nowDisabling ? "settings.user_disabled" : "settings.user_enabled", {
+    firmId: firm.id,
+    userId: admin.id,
+    detail: { targetUserId: targetId },
+  });
+  revalidatePath("/settings");
+}
+
 export default async function SettingsPage({
   searchParams,
 }: {
@@ -226,6 +258,7 @@ export default async function SettingsPage({
                     </span>
                     <span className="flex items-center gap-2 shrink-0">
                       <span className="text-dim">{u.role}</span>
+                      {u.disabledAt && <span className="field-label text-stamp">disabled</span>}
                       {u.totpEnabledAt ? (
                         <span className="field-label text-ok">2FA</span>
                       ) : (
@@ -239,6 +272,21 @@ export default async function SettingsPage({
                             title="Clear this person's 2FA — use if they've lost their device and backup codes"
                           >
                             reset 2FA
+                          </button>
+                        </form>
+                      )}
+                      {u.id !== user.id && (
+                        <form action={toggleUserDisabled}>
+                          <input type="hidden" name="userId" value={u.id} />
+                          <button
+                            className={`field-label text-dim ${u.disabledAt ? "hover:text-ok" : "hover:text-stamp"}`}
+                            title={
+                              u.disabledAt
+                                ? "Restore this person's access"
+                                : "Revoke this person's access — use when someone leaves the firm"
+                            }
+                          >
+                            {u.disabledAt ? "enable" : "disable"}
                           </button>
                         </form>
                       )}

@@ -22,9 +22,10 @@ export async function GET() {
     await db.execute(sql`select 1`);
     return NextResponse.json({ ok: true, time: new Date().toISOString() });
   } catch (e) {
-    return NextResponse.json(
-      { ok: false, time: new Date().toISOString(), error: (e as Error).message },
-      { status: 503 }
-    );
+    // Logged server-side only — this route is public and unauthenticated, so
+    // the raw error (which can include connection details) never goes in the
+    // response body. The uptime monitor only needs ok:false to page someone.
+    console.error("[health] check failed:", (e as Error).message);
+    return NextResponse.json({ ok: false, time: new Date().toISOString() }, { status: 503 });
   }
 }
