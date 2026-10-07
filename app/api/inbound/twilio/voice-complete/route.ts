@@ -3,6 +3,7 @@ import { firmForTwilioNumber, verifyTwilioSignature } from "@/lib/channels/twili
 import { enqueue } from "@/lib/queue";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30; // after()-triggered triage kick needs the room
 
 // Fires when the recording finishes. The transcription callback usually
 // creates the lead; this schedules a safety-net job in case it never arrives.

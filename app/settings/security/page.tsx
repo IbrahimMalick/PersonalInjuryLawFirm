@@ -7,6 +7,7 @@ import AppShell from "@/components/product/AppShell";
 import { audit } from "@/lib/audit";
 import {
   clearNewBackupCodesCookie,
+  hashPassword,
   peekNewBackupCodesCookie,
   requireFirmUser,
   setNewBackupCodesCookie,
@@ -30,6 +31,27 @@ export const dynamic = "force-dynamic";
 // admins, the same way setting a lead's outcome or adding a note isn't.
 // Settings (the firm-wide page) stays admin-only; a reviewer who can't get
 // into /settings can still reach this.
+
+async function changePassword(formData: FormData): Promise<void> {
+  "use server";
+  const { user } = await requireFirmUser();
+  const currentPassword = String(formData.get("currentPassword") ?? "");
+  const newPassword = String(formData.get("newPassword") ?? "");
+  if (newPassword.length < 10) redirect("/settings/security?error=password");
+
+  const db = await getDb();
+  const row = (await db.select().from(tables.users).where(eq(tables.users.id, user.id)).limit(1))[0];
+  if (!row || !(await verifyPassword(currentPassword, row.passwordHash))) {
+    redirect("/settings/security?error=password");
+  }
+
+  await db
+    .update(tables.users)
+    .set({ passwordHash: await hashPassword(newPassword) })
+    .where(eq(tables.users.id, user.id));
+  await audit("settings.password_changed", { firmId: user.firmId, userId: user.id });
+  redirect("/settings/security?passwordChanged=1");
+}
 
 async function startEnrollment(): Promise<void> {
   "use server";
@@ -123,11 +145,11 @@ async function disableTwoFactor(formData: FormData): Promise<void> {
 export default async function SecuritySettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; passwordChanged?: string }>;
 }) {
   if (isDemo()) redirect("/demo");
   const { user, firm } = await requireFirmUser();
-  const { error } = await searchParams;
+  const { error, passwordChanged } = await searchParams;
   const newBackupCodes = await peekNewBackupCodesCookie();
 
   const card = "rounded-sm border border-ink-line bg-ink-raised px-5 py-4";
@@ -173,6 +195,40 @@ export default async function SecuritySettingsPage({
             </form>
           </div>
         )}
+
+        <div className={`${card} mb-4`}>
+          <h2 className={h2}>Password</h2>
+          <p className="text-sm text-dim leading-snug">{user.email}</p>
+          {passwordChanged === "1" && (
+            <p className="field-label text-ok mt-3">Password changed.</p>
+          )}
+          {error === "password" && (
+            <p className="text-stamp text-sm mt-2">
+              Current password didn&apos;t match, or the new one is under 10 characters —
+              nothing changed.
+            </p>
+          )}
+          <form action={changePassword} className="mt-3 space-y-3">
+            <label className="block">
+              <span className="field-label text-dim">Current password</span>
+              <input name="currentPassword" type="password" required className={input} />
+            </label>
+            <label className="block">
+              <span className="field-label text-dim">New password (10+ characters)</span>
+              <input
+                name="newPassword"
+                type="password"
+                required
+                minLength={10}
+                autoComplete="new-password"
+                className={input}
+              />
+            </label>
+            <button className="rounded-sm bg-manila text-papertext font-display font-bold uppercase tracking-wider text-sm px-4 py-2 hover:bg-manila-deep">
+              Change password
+            </button>
+          </form>
+        </div>
 
         <div className={card}>
           <h2 className={h2}>Two-factor authentication</h2>

@@ -6,6 +6,7 @@ import {
 } from "@/lib/channels/twilio";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30; // after()-triggered triage kick needs the room
 
 export async function POST(request: Request) {
   const form = await request.formData();

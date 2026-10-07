@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, gte, lt, lte, sql } from "drizzle-orm";
 import { getDb, tables } from "./db";
 import type { JobRow } from "./db/schema";
 
@@ -96,12 +96,39 @@ export async function failJob(job: JobRow, error: Error): Promise<boolean> {
   return dead;
 }
 
-/** Recover jobs stuck in "running" after a crash (visibility timeout). */
-export async function recoverStuckJobs(olderThanMinutes = 10): Promise<void> {
+/**
+ * Recover jobs stuck in "running" after a crash or a serverless timeout
+ * (visibility timeout). Returns the jobs this call dead-lettered, so the
+ * caller can run the same onDead cleanup failJob's normal path would —
+ * see lib/worker.ts.
+ *
+ * claimNext() increments `attempts` at claim time, before the job runs — so
+ * a job killed mid-flight (a lambda timeout, not a clean throw) never
+ * reaches failJob's own dead-lettering; it just sits "running" until this
+ * function finds it. Reviving it to "pending" unconditionally, as this used
+ * to do, means a job that gets killed every single attempt loops forever:
+ * nothing ever marks it dead, burning a model call on every pass (exactly
+ * the "lead reads 'Reading…' indefinitely" bug).
+ */
+export async function recoverStuckJobs(olderThanMinutes = 10): Promise<JobRow[]> {
   const db = await getDb();
   const cutoff = new Date(Date.now() - olderThanMinutes * 60_000).toISOString();
-  await db.execute(sql`
-    UPDATE jobs SET status = 'pending', run_at = ${new Date().toISOString()}
-    WHERE status = 'running' AND started_at <= ${cutoff}
-  `);
+  const stuck = and(eq(tables.jobs.status, "running"), lte(tables.jobs.startedAt, cutoff));
+
+  const dead = await db
+    .update(tables.jobs)
+    .set({
+      status: "dead",
+      finishedAt: new Date().toISOString(),
+      lastError: "Killed mid-flight (serverless timeout) on its last available attempt",
+    })
+    .where(and(stuck, gte(tables.jobs.attempts, tables.jobs.maxAttempts)))
+    .returning();
+
+  await db
+    .update(tables.jobs)
+    .set({ status: "pending", runAt: new Date().toISOString() })
+    .where(and(stuck, lt(tables.jobs.attempts, tables.jobs.maxAttempts)));
+
+  return dead;
 }

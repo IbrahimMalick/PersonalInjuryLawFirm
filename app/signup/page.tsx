@@ -53,30 +53,33 @@ async function signup(formData: FormData): Promise<void> {
   // "that address is special" to an anonymous visitor is its own small leak.
   if (isOperatorEmail(email)) redirect("/signup?error=email");
 
-  const firm = await createFirm(firmName, practiceLine, practiceArea);
-  if (billingEnabled()) {
-    await updateFirm(firm.id, {
-      trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 86_400_000).toISOString(),
-    });
-  }
-  const inserted = await db
-    .insert(tables.users)
-    .values({
-      firmId: firm.id,
-      email,
-      name,
-      passwordHash: await hashPassword(password),
-      role: "admin",
-    })
-    .returning();
-  await sendVerificationEmail(inserted[0]);
+  const passwordHash = await hashPassword(password);
+  // One transaction, not three bare writes: without it, a failure between
+  // creating the firm and inserting its first user leaves an orphaned firm
+  // with no one able to log into it or clean it up through the product.
+  const { firm, adminUser } = await db.transaction(async (tx) => {
+    const firm = await createFirm(firmName, practiceLine, practiceArea, tx);
+    if (billingEnabled()) {
+      await updateFirm(
+        firm.id,
+        { trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 86_400_000).toISOString() },
+        tx
+      );
+    }
+    const inserted = await tx
+      .insert(tables.users)
+      .values({ firmId: firm.id, email, name, passwordHash, role: "admin" })
+      .returning();
+    return { firm, adminUser: inserted[0] };
+  });
+  await sendVerificationEmail(adminUser);
 
   await audit("firm.signed_up", {
     firmId: firm.id,
-    userId: inserted[0].id,
+    userId: adminUser.id,
     detail: { firmName, slug: firm.slug, adminEmail: email, practiceArea },
   });
-  await createSession(inserted[0].id);
+  await createSession(adminUser.id);
   redirect("/?welcome=1");
 }
 

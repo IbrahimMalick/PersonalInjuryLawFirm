@@ -6,6 +6,10 @@ import {
 } from "@/lib/channels/twilio";
 
 export const dynamic = "force-dynamic";
+// Vercel's default function timeout is too short for the after()-triggered
+// triage kick (lib/queue.ts) to finish a real Claude call. See the audit
+// note on app/api/inbound/webform/route.ts, which already had this.
+export const maxDuration = 30;
 
 const EMPTY_TWIML = `<?xml version="1.0" encoding="UTF-8"?><Response/>`;
 
