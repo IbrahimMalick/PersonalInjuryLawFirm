@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import AppShell from "@/components/product/AppShell";
 import { audit } from "@/lib/audit";
-import { hashPassword, requireFirmUser } from "@/lib/auth";
+import { hashPassword, isOperatorEmail, requireFirmUser } from "@/lib/auth";
 import { channelStatus } from "@/lib/channels/outbound";
 import { getDb, tables } from "@/lib/db";
 import { updateFirm } from "@/lib/firm";
@@ -53,6 +53,10 @@ async function addUser(formData: FormData): Promise<void> {
     .where(eq(tables.users.email, email))
     .limit(1);
   if (existing[0]) redirect("/settings?userError=2");
+  // A firm admin could otherwise add a teammate using an address reserved
+  // for a platform operator who hasn't signed up with it yet — and that
+  // teammate would pass isOperator()'s email check. See lib/auth.ts.
+  if (isOperatorEmail(email)) redirect("/settings?userError=3");
   await db
     .insert(tables.users)
     .values({ firmId: firm.id, email, name, passwordHash: await hashPassword(password), role });
@@ -246,7 +250,9 @@ export default async function SettingsPage({
                 <p className="text-stamp text-sm pb-2">
                   {userError === "2"
                     ? "That email already has an account."
-                    : "All fields required; password 10+ characters."}
+                    : userError === "3"
+                      ? "That email address is reserved and can't be used for a firm account."
+                      : "All fields required; password 10+ characters."}
                 </p>
               )}
               <form action={addUser} className="grid grid-cols-2 gap-2">

@@ -1,6 +1,6 @@
 {
-  "id": "de580951-fb2a-4b66-a06d-a7f454c8d21a",
-  "prevId": "e333b786-7d37-404b-a0f8-8b46ad5033f1",
+  "id": "dea17609-cdbb-45c7-8d76-14dc022e622d",
+  "prevId": "de580951-fb2a-4b66-a06d-a7f454c8d21a",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -784,6 +784,12 @@
         "leads_external_idx": {
           "name": "leads_external_idx",
           "columns": [
+            {
+              "expression": "firm_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
             {
               "expression": "channel",
               "isExpression": false,

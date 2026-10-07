@@ -150,15 +150,35 @@ export async function requireFirmUser(
 }
 
 /**
- * Platform operators (us): normal accounts whose email is allowlisted in
- * OPERATOR_EMAILS. Gates the /operator console used for onboarding firms.
+ * Is this email address one OPERATOR_EMAILS reserves for the platform?
+ * Shared by isOperator() below AND by every place a customer-controlled form
+ * can create a user (signup, Settings → Add user) — those must refuse to let
+ * a customer claim a reserved address themselves. See isOperator()'s comment
+ * for why that refusal alone isn't the whole fix.
  */
-export function isOperator(user: UserRow): boolean {
+export function isOperatorEmail(email: string): boolean {
   const list = (process.env.OPERATOR_EMAILS ?? "")
     .split(",")
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
-  return list.includes(user.email.toLowerCase());
+  return list.includes(email.trim().toLowerCase());
+}
+
+/**
+ * Platform operators (us): normal accounts whose email is allowlisted in
+ * OPERATOR_EMAILS. Gates the /operator console used for onboarding firms.
+ *
+ * Requiring emailVerifiedAt matters on its own, not just alongside the
+ * signup/addUser checks: it's the one proof that whoever is logged in as
+ * this address actually controls that inbox, rather than merely having
+ * typed it into a form. Before this, a customer could add a teammate using
+ * an operator address that the real operator hadn't signed up with yet —
+ * the deploy guide's own instructions (set OPERATOR_EMAILS, THEN sign up
+ * with those addresses) created exactly that window — and get full platform
+ * access, including deleting another firm, with zero verification.
+ */
+export function isOperator(user: UserRow): boolean {
+  return Boolean(user.emailVerifiedAt) && isOperatorEmail(user.email);
 }
 
 /**

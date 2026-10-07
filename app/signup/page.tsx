@@ -3,13 +3,14 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { audit } from "@/lib/audit";
-import { createSession, hashPassword } from "@/lib/auth";
+import { createSession, hashPassword, isOperatorEmail } from "@/lib/auth";
 import { sendVerificationEmail } from "@/lib/auth-tokens";
 import { billingEnabled, TRIAL_DAYS } from "@/lib/billing";
 import { updateFirm } from "@/lib/firm";
 import { getDb, tables } from "@/lib/db";
 import { createFirm } from "@/lib/firm";
 import { PRACTICE_AREA_LABEL } from "@/lib/labels";
+import { rateLimited } from "@/lib/rate-limit";
 import { PRACTICE_AREAS, type PracticeArea } from "@/lib/schema";
 
 export const dynamic = "force-dynamic";
@@ -18,23 +19,11 @@ export const dynamic = "force-dynamic";
 // intake form works the moment this completes; everything else is guided by
 // the onboarding checklist (with us on the phone when they want hands held).
 
-const attempts = new Map<string, { count: number; windowStart: number }>();
-function throttled(ip: string): boolean {
-  const now = Date.now();
-  const entry = attempts.get(ip);
-  if (!entry || now - entry.windowStart > 3_600_000) {
-    attempts.set(ip, { count: 1, windowStart: now });
-    return false;
-  }
-  entry.count++;
-  return entry.count > 5;
-}
-
 async function signup(formData: FormData): Promise<void> {
   "use server";
   const hdrs = await headers();
   const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (throttled(ip)) redirect("/signup?error=rate");
+  if (await rateLimited(`signup:${ip}`, 5, 3_600_000)) redirect("/signup?error=rate");
 
   const firmName = String(formData.get("firmName") ?? "").trim();
   const practiceLine = String(formData.get("practiceLine") ?? "").trim();
@@ -57,6 +46,12 @@ async function signup(formData: FormData): Promise<void> {
     .where(eq(tables.users.email, email))
     .limit(1);
   if (existing[0]) redirect("/signup?error=email");
+  // Same hole as Settings → Add user: a signup is itself a customer-controlled
+  // form that can mint a user with any email. See lib/auth.ts isOperator().
+  // Reuses the generic "email already has an account" message rather than a
+  // distinct one — this form is public and unauthenticated, so confirming
+  // "that address is special" to an anonymous visitor is its own small leak.
+  if (isOperatorEmail(email)) redirect("/signup?error=email");
 
   const firm = await createFirm(firmName, practiceLine, practiceArea);
   if (billingEnabled()) {
