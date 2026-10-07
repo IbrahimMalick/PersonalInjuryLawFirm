@@ -57,6 +57,13 @@
       "when": 1791382234026,
       "tag": "0007_reflective_kylun",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791386693080,
+      "tag": "0008_last_king_cobra",
+      "breakpoints": true
     }
   ]
 }

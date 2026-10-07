@@ -27,11 +27,20 @@ export async function ingestLead(
   const db = await getDb();
   const externalId = inbound.externalId ?? crypto.randomUUID();
 
+  // Scoped by firmId as well as (channel, externalId): externalId is
+  // provider-assigned, but for email it's the Message-ID header, which the
+  // SENDER controls. Without firmId here, a crafted Message-ID matching
+  // another firm's existing lead would return THAT firm's leadId as "this
+  // firm's duplicate" — a cross-tenant collision, not just a dedupe miss.
   const existing = await db
     .select({ id: tables.leads.id })
     .from(tables.leads)
     .where(
-      and(eq(tables.leads.channel, inbound.channel), eq(tables.leads.externalId, externalId))
+      and(
+        eq(tables.leads.firmId, inbound.firmId),
+        eq(tables.leads.channel, inbound.channel),
+        eq(tables.leads.externalId, externalId)
+      )
     )
     .limit(1);
   if (existing[0]) return { leadId: existing[0].id, duplicate: true };

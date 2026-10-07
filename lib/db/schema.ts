@@ -166,7 +166,11 @@ export const leads = pgTable(
   (t) => [
     index("leads_firm_status_idx").on(t.firmId, t.status),
     index("leads_firm_received_idx").on(t.firmId, t.receivedAt),
-    uniqueIndex("leads_external_idx").on(t.channel, t.externalId),
+    // Scoped by firmId, not just (channel, externalId): externalId for email
+    // is the sender-controlled Message-ID header, so an unscoped unique index
+    // let one firm's crafted Message-ID collide with another firm's existing
+    // row at the database level. See lib/channels/inbound.ts's ingestLead.
+    uniqueIndex("leads_external_idx").on(t.firmId, t.channel, t.externalId),
   ]
 );
 

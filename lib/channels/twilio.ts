@@ -115,11 +115,18 @@ export async function runTranscribeVoicemail(payload: {
   durationSec?: number;
 }): Promise<void> {
   const db = await getDb();
+  // Scoped by firmId for the same reason as lib/channels/inbound.ts's own
+  // check: without it, this would match any firm's lead with this CallSid,
+  // not just this firm's.
   const existing = await db
     .select({ id: tables.leads.id })
     .from(tables.leads)
     .where(
-      and(eq(tables.leads.channel, "voicemail"), eq(tables.leads.externalId, payload.callSid))
+      and(
+        eq(tables.leads.firmId, payload.firmId),
+        eq(tables.leads.channel, "voicemail"),
+        eq(tables.leads.externalId, payload.callSid)
+      )
     )
     .limit(1);
   if (existing[0]) return; // transcription callback already created it
