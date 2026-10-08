@@ -3,6 +3,7 @@ import { uploadAttachments } from "@/lib/blob";
 import { ingestLead } from "@/lib/channels/inbound";
 import { getFirmBySlug } from "@/lib/firm";
 import { rateLimited } from "@/lib/rate-limit";
+import { turnstileConfigured, verifyTurnstile } from "@/lib/turnstile";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30; // room for a few file uploads
@@ -57,6 +58,14 @@ export async function POST(request: Request) {
   const renderedAt = Number(fields._renderedAt ?? 0);
   if (!renderedAt || Date.now() - renderedAt < 2000) {
     return done();
+  }
+  // Turnstile, only once a firm's deploy has both keys set (see
+  // lib/turnstile.ts) — inert otherwise, same as every other optional
+  // integration. "cf-turnstile-response" is the field name Cloudflare's
+  // widget script injects into the form itself.
+  if (turnstileConfigured()) {
+    const ok = await verifyTurnstile(fields["cf-turnstile-response"] ?? "", ip);
+    if (!ok) return NextResponse.json({ error: "Verification failed — please try again" }, { status: 400 });
   }
 
   const firstName = (fields.firstName ?? "").trim().slice(0, 100);

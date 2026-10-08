@@ -9,7 +9,7 @@ exactly what to click and what value to copy where.
 
 - A GitHub account with access to this repository
 - A Vercel account (vercel.com — sign up with that GitHub account; the **Pro
-  plan is required** for the every-minute cron job, see step 7)
+  plan is required** for the cron job to run more than once a day, see step 7)
 - A Neon account (neon.tech, free tier is fine to start) for Postgres
 - An Anthropic API key (console.anthropic.com)
 - A SendGrid account (sendgrid.com) for email
@@ -131,8 +131,8 @@ Billing. With Stripe env vars unset, everything is simply free.
 
 ## Step 7 — Turn on the cron sweeper
 
-The repo ships `vercel.json` with a cron that calls `/api/jobs/run` every
-minute; it retries stuck work and is the safety net behind instant
+The repo ships `vercel.json` with a cron that calls `/api/jobs/run` every 10
+minutes; it retries stuck work and is the safety net behind instant
 processing.
 
 - **Vercel Pro is required** — the Hobby plan limits crons to once per day,

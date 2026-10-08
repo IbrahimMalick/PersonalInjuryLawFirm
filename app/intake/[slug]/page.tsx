@@ -5,6 +5,7 @@ import IntakeSubmitButton from "@/components/IntakeSubmitButton";
 import { blobConfigured } from "@/lib/blob";
 import { getFirmBySlug } from "@/lib/firm";
 import { intakeCopyFor, intakeLang } from "@/lib/intake-copy";
+import { turnstileSiteKey } from "@/lib/turnstile";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,7 @@ export default async function IntakeForm({
   const { slug } = await params;
   const firm = await getFirmBySlug(slug);
   if (!firm) notFound();
+  const siteKey = turnstileSiteKey();
   const { sent, lang: langParam } = await searchParams;
   const lang = intakeLang(langParam);
   const t = intakeCopyFor(firm.practiceArea, lang);
@@ -239,6 +241,12 @@ export default async function IntakeForm({
               className="absolute -left-[9999px] w-px h-px opacity-0"
             />
             <input type="hidden" name="_renderedAt" value={Date.now()} />
+            {siteKey && (
+              <>
+                <div className="cf-turnstile" data-sitekey={siteKey} />
+                <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer />
+              </>
+            )}
             <IntakeSubmitButton className="w-full rounded-sm bg-carbon text-paper font-display font-bold uppercase tracking-wider text-lg py-3 hover:bg-ink transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
               {t.submit}
             </IntakeSubmitButton>

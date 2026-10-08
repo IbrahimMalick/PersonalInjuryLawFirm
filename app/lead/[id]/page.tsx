@@ -472,6 +472,7 @@ export default async function LeadReview({ params }: { params: Promise<{ id: str
                 }}
                 headerNote={`Draft reply — ${EMAIL_CHANNEL_LABELS[lead.channel]} · ${LANGUAGE_LABEL[lang] ?? "English"}`}
                 destination={destination?.describe ?? null}
+                destinationMismatch={destination?.mismatch ?? false}
                 conflict={conflict}
                 isAdmin={user.role === "admin"}
                 sent={
