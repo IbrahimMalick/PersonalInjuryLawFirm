@@ -96,6 +96,10 @@ export default function CaseFilePanel({ lead }: { lead: Lead | null }) {
 
   const cf: CaseFile = lead.caseFile;
   const revealTs = desk.revealAt[lead.id];
+  // Cosmetic "just revealed" animation window for the demo only — DeskData's
+  // own 8s poll keeps this panel re-rendering often enough in practice that
+  // the flag clears on its own without a dedicated timer.
+  // eslint-disable-next-line react-hooks/purity
   const animate = Boolean(revealTs && Date.now() - revealTs < 12_000);
   let i = 0;
   const d = () => i++ * 150;

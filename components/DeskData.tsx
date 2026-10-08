@@ -39,7 +39,14 @@ export function DeskDataProvider({ children }: { children: React.ReactNode }) {
   const [running, setRunning] = useState(false);
   const arrivalLogged = useRef<Set<string>>(new Set());
   const clockRef = useRef(clock);
-  clockRef.current = clock;
+  // Synced in an effect, not during render: the callbacks below (runOne,
+  // reset, logLine, …) only read clockRef.current from inside event
+  // handlers, never during render, so it just needs to be current by the
+  // time one of those fires — an unconditional post-render effect
+  // guarantees that without mutating a ref while rendering.
+  useEffect(() => {
+    clockRef.current = clock;
+  });
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/demo/state", { cache: "no-store" });
@@ -47,6 +54,9 @@ export function DeskDataProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Demo polling: fetch immediately on mount, then every 8s. The direct
+    // setState-in-effect is the standard pattern for "load on mount."
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
     const id = setInterval(refresh, 8000);
     return () => clearInterval(id);

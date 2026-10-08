@@ -238,6 +238,11 @@ export default async function IntakeForm({
               aria-hidden="true"
               className="absolute -left-[9999px] w-px h-px opacity-0"
             />
+            {/* This is a Server Component rendered fresh per request (dynamic =
+                "force-dynamic" above) — Date.now() here is the actual server
+                render time the fill-time anti-bot check in the webform route
+                needs, not a client re-render concern. */}
+            {/* eslint-disable-next-line react-hooks/purity */}
             <input type="hidden" name="_renderedAt" value={Date.now()} />
             <IntakeSubmitButton className="w-full rounded-sm bg-carbon text-paper font-display font-bold uppercase tracking-wider text-lg py-3 hover:bg-ink transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
               {t.submit}
