@@ -53,6 +53,10 @@ export default async function InsightsPage() {
   const { user, firm } = await requireFirmUser();
   const db = await getDb();
 
+  // Server Component rendered fresh per request (dynamic = "force-dynamic")
+  // — Date.now() is the real request time this report window needs, not a
+  // client re-render concern.
+  // eslint-disable-next-line react-hooks/purity
   const since = new Date(Date.now() - WINDOW_DAYS * 86_400_000).toISOString();
   const rows = await db
     .select({

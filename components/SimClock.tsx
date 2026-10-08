@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { SIM_START } from "@/lib/seeds";
 
 // The simulated clock. Starts at 2:47 AM "tonight" and runs at 1×, 3×, or 60×
@@ -63,12 +63,18 @@ export function formatSim(ms: number, withSeconds = false): string {
 export function SimClockProvider({ children }: { children: React.ReactNode }) {
   const [anchor, setAnchor] = useState<ClockAnchor>(freshAnchor);
   const [nowReal, setNowReal] = useState<number>(() => Date.now());
-  const startRef = useRef<number>(0);
-  if (startRef.current === 0 && typeof window !== "undefined") {
-    startRef.current = simStartToday();
-  }
+  // Computed once, lazily — same effect as the old ref-mutated-during-render
+  // version (0 during SSR since `window` isn't defined there, the real value
+  // once this renders on the client), but via useState's initializer instead
+  // of writing a ref during render, which React disallows.
+  const [simStartMs] = useState<number>(() => (typeof window !== "undefined" ? simStartToday() : 0));
 
   useEffect(() => {
+    // sessionStorage only exists client-side, so the initial useState above
+    // starts from a safe SSR-matching default (freshAnchor) and this effect
+    // corrects it right after mount — the standard way to load client-only
+    // storage without a hydration mismatch.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAnchor(loadAnchor());
     const id = setInterval(() => setNowReal(Date.now()), 250);
     return () => clearInterval(id);
@@ -82,7 +88,6 @@ export function SimClockProvider({ children }: { children: React.ReactNode }) {
   };
 
   const simMs = anchor.anchorSim + (nowReal - anchor.anchorReal) * anchor.speed;
-  const simStartMs = startRef.current || simStartToday();
 
   const setSpeed = useCallback(
     (s: Speed) => {
