@@ -11,6 +11,7 @@ import { resolveReplyDestination } from "@/lib/reply";
 import { contactOf, practiceAreaOf, type AnyCaseFile } from "@/lib/casefile";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30; // after()-triggered send kick needs the room
 
 // A human approving a reply. The body may have been edited — that edit is
 // itself audited. Conflict-flagged leads require an admin.

@@ -50,16 +50,32 @@ describe("deleteFirmCascade", () => {
       .insert(tables.leads)
       .values({ id: crypto.randomUUID(), firmId: target.id, channel: "webform", fromAddress: "x@y.com", raw: "hi", status: "received" })
       .returning();
-    await db.insert(tables.messages).values({
-      firmId: target.id,
-      leadId: lead.id,
-      channel: "webform",
-      toAddress: "x@y.com",
-      body: "reply",
-      approvedBy: targetUser.id,
-    });
+    const [message] = await db
+      .insert(tables.messages)
+      .values({
+        firmId: target.id,
+        leadId: lead.id,
+        channel: "webform",
+        toAddress: "x@y.com",
+        body: "reply",
+        approvedBy: targetUser.id,
+      })
+      .returning();
     await db.insert(tables.leadNotes).values({ firmId: target.id, leadId: lead.id, userId: targetUser.id, body: "note" });
     await db.insert(tables.auditEvents).values({ firmId: target.id, leadId: lead.id, userId: targetUser.id, type: "test.event" });
+    // jobs has no firmId column — reached by payload, three different ways.
+    const [jobByLead] = await db
+      .insert(tables.jobs)
+      .values({ type: "process_lead", payload: { leadId: lead.id } })
+      .returning({ id: tables.jobs.id });
+    const [jobByMessage] = await db
+      .insert(tables.jobs)
+      .values({ type: "send_message", payload: { messageId: message.id } })
+      .returning({ id: tables.jobs.id });
+    const [jobByFirmId] = await db
+      .insert(tables.jobs)
+      .values({ type: "transcribe_voicemail", payload: { firmId: target.id, callSid: "CA_target" } })
+      .returning({ id: tables.jobs.id });
 
     // A second, untouched firm — the control group that must survive intact.
     const other = await createFirm("Keep Me Law", "", "personal_injury");
@@ -75,6 +91,10 @@ describe("deleteFirmCascade", () => {
       .returning();
     await db.insert(tables.leadNotes).values({ firmId: other.id, leadId: otherLead.id, userId: otherUser.id, body: "keep this" });
     await db.insert(tables.auditEvents).values({ firmId: other.id, leadId: otherLead.id, userId: otherUser.id, type: "test.event" });
+    const [otherJob] = await db
+      .insert(tables.jobs)
+      .values({ type: "process_lead", payload: { leadId: otherLead.id } })
+      .returning({ id: tables.jobs.id });
 
     const counts = await deleteFirmCascade(target.id);
     expect(counts).toEqual({ users: 1, leads: 1, messages: 1, leadNotes: 1, auditEvents: 1, adverseParties: 1 });
@@ -89,6 +109,12 @@ describe("deleteFirmCascade", () => {
     expect(await db.select().from(tables.messages).where(eq(tables.messages.firmId, target.id))).toEqual([]);
     expect(await db.select().from(tables.leadNotes).where(eq(tables.leadNotes.firmId, target.id))).toEqual([]);
     expect(await db.select().from(tables.auditEvents).where(eq(tables.auditEvents.firmId, target.id))).toEqual([]);
+    // All three ways a queued job can reference this firm are gone — a
+    // straggler here could otherwise fire after deletion and recreate a
+    // lead or audit row for a firm that no longer exists.
+    expect(await db.select().from(tables.jobs).where(eq(tables.jobs.id, jobByLead.id))).toEqual([]);
+    expect(await db.select().from(tables.jobs).where(eq(tables.jobs.id, jobByMessage.id))).toEqual([]);
+    expect(await db.select().from(tables.jobs).where(eq(tables.jobs.id, jobByFirmId.id))).toEqual([]);
 
     // The other firm's data is completely untouched — the point of the test.
     expect((await db.select().from(tables.firms).where(eq(tables.firms.id, other.id))).length).toBe(1);
@@ -98,6 +124,7 @@ describe("deleteFirmCascade", () => {
     expect((await db.select().from(tables.leads).where(eq(tables.leads.firmId, other.id))).length).toBe(1);
     expect((await db.select().from(tables.leadNotes).where(eq(tables.leadNotes.firmId, other.id))).length).toBe(1);
     expect((await db.select().from(tables.auditEvents).where(eq(tables.auditEvents.firmId, other.id))).length).toBe(1);
+    expect((await db.select().from(tables.jobs).where(eq(tables.jobs.id, otherJob.id))).length).toBe(1);
   });
 
   it("is a no-op, not a crash, for a firm with no users and nothing else attached", async () => {

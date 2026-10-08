@@ -34,9 +34,19 @@ async function handle(job: JobRow): Promise<void> {
   }
 }
 
-async function onDead(job: JobRow, error: Error): Promise<void> {
+export async function onDead(job: JobRow, error: Error): Promise<void> {
   if (job.type === "process_lead") {
     await markLeadNeedsAttention(String(job.payload.leadId), error.message);
+  }
+}
+
+/** recoverStuckJobs() dead-letters jobs directly (no throw to catch in tick()),
+ * so its callers run the same onDead cleanup failJob's own path would. */
+async function handleRecoveredDead(jobs: JobRow[]): Promise<void> {
+  for (const job of jobs) {
+    await onDead(job, new Error(job.lastError ?? "stuck job recovery")).catch((err) =>
+      console.error(`[worker] onDead handler failed:`, err)
+    );
   }
 }
 
@@ -79,8 +89,9 @@ export function startWorker(): void {
   globalThis.__nightshiftWorker = { running: true };
   console.log("[worker] Nightshift background worker started");
 
-  recoverStuckJobs().catch(() => {});
-  setInterval(() => recoverStuckJobs().catch(() => {}), 5 * 60_000);
+  const runRecovery = () => recoverStuckJobs().then(handleRecoveredDead).catch(() => {});
+  void runRecovery();
+  setInterval(runRecovery, 5 * 60_000);
 
   const loop = async () => {
     while (globalThis.__nightshiftWorker?.running) {

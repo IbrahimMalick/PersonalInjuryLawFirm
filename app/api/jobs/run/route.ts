@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { recoverStuckJobs } from "@/lib/queue";
-import { drainJobs } from "@/lib/worker";
+import { drainJobs, onDead } from "@/lib/worker";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -20,7 +20,12 @@ export async function GET(request: Request) {
   if (!authorized(request)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  await recoverStuckJobs();
+  const deadJobs = await recoverStuckJobs();
+  for (const job of deadJobs) {
+    await onDead(job, new Error(job.lastError ?? "stuck job recovery")).catch((err) =>
+      console.error(`[jobs/run] onDead handler failed:`, err)
+    );
+  }
   const processed = await drainJobs(25);
   return NextResponse.json({ ok: true, processed });
 }

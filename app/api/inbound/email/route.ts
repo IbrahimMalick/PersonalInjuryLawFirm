@@ -4,6 +4,7 @@ import { ingestLead } from "@/lib/channels/inbound";
 import { getDb, tables } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30; // after()-triggered triage kick needs the room
 
 // SendGrid Inbound Parse posts multipart form data here. The URL carries the
 // FIRM'S token (?token=...) — each firm gets its own, shown in Settings, so

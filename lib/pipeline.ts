@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { audit } from "./audit";
 import { ESCALATION_DELAY_SECONDS, notifyEscalation, notifyHighPriorityLead } from "./alerts";
 import { getDb, tables } from "./db";
@@ -153,10 +153,21 @@ export async function runProcessLead(leadId: string): Promise<void> {
   // failure fail the triage that already succeeded.
   if (isHighPriority(caseFile)) {
     try {
-      await notifyHighPriorityLead(lead, caseFile, firm.name);
-      await audit("lead.alert_sent", { firmId: lead.firmId, leadId, detail: { channel: "email" } });
+      const delivered = await notifyHighPriorityLead(lead, caseFile, firm.name);
+      // Only "lead.alert_sent" when someone was actually emailed — an
+      // unconfigured or failing provider used to resolve successfully here,
+      // so the audit trail affirmatively claimed a page went out when no one
+      // was notified at all.
+      await audit(delivered ? "lead.alert_sent" : "lead.alert_failed", {
+        firmId: lead.firmId,
+        leadId,
+        detail: { channel: "email" },
+      });
     } catch (e) {
       console.error(`[alerts] notify failed for ${leadId}: ${(e as Error).message}`);
+      await audit("lead.alert_failed", { firmId: lead.firmId, leadId, detail: { channel: "email" } }).catch(
+        () => {}
+      );
     }
     await enqueue("escalate_lead", { leadId }, { delaySeconds: ESCALATION_DELAY_SECONDS });
   }
@@ -220,11 +231,17 @@ export async function runEscalateLead(leadId: string): Promise<void> {
   )[0];
   if (!lead || lead.status === "archived") return;
 
+  // Same fix as the inbox query (app/page.tsx): a "failed" message row used
+  // to count as "replied" here too, which would silently suppress the
+  // 30-minute escalation reminder for a lead whose reply actually never
+  // went out.
   const replied = (
     await db
       .select({ id: tables.messages.id })
       .from(tables.messages)
-      .where(eq(tables.messages.leadId, leadId))
+      .where(
+        and(eq(tables.messages.leadId, leadId), inArray(tables.messages.status, ["sent", "simulated"]))
+      )
       .limit(1)
   )[0];
   if (replied) return;
@@ -240,8 +257,8 @@ export async function runEscalateLead(leadId: string): Promise<void> {
   ).getTime();
   const waitedMinutes = Math.round((Date.now() - receivedMs) / 60_000);
 
-  await notifyEscalation(lead, caseFile, firm.name, waitedMinutes);
-  await audit("lead.escalated", { firmId: lead.firmId, leadId, detail: { waitedMinutes } });
+  const delivered = await notifyEscalation(lead, caseFile, firm.name, waitedMinutes);
+  await audit("lead.escalated", { firmId: lead.firmId, leadId, detail: { waitedMinutes, delivered } });
 }
 
 export async function runSendMessage(messageId: number): Promise<void> {
@@ -250,7 +267,14 @@ export async function runSendMessage(messageId: number): Promise<void> {
     await db.select().from(tables.messages).where(eq(tables.messages.id, messageId)).limit(1)
   )[0];
   if (!message) throw new Error(`Message ${messageId} not found`);
-  if (message.status !== "queued") return; // idempotent
+  // Idempotent against a stale retry of an already-delivered send — but
+  // "failed" is NOT a terminal state here. It used to be treated as one:
+  // this guard returned (success, no retry) for "failed" exactly as it does
+  // for "sent", so the very first send attempt that failed became
+  // permanent — the job queue's own retry/backoff never got a real second
+  // try, because this function just no-op'd and reported success on every
+  // subsequent attempt.
+  if (message.status === "sent" || message.status === "simulated") return;
 
   const firm = await getFirmById(message.firmId);
   if (!firm) throw new Error(`Firm ${message.firmId} not found for message ${messageId}`);

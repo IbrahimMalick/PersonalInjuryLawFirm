@@ -220,14 +220,20 @@ export default async function Inbox({
     .orderBy(desc(tables.leads.receivedAt))
     .limit(hasFilters ? 1000 : 200);
 
+  // Only a message that actually went out counts as "replied" — a "failed"
+  // row used to count too, so a permanently failed send still showed the
+  // inbox's "Reply sent ✓" badge and dropped off the "needs eyes" list.
   const repliedRows = leads.length
     ? await db
         .select({ leadId: tables.messages.leadId })
         .from(tables.messages)
         .where(
-          inArray(
-            tables.messages.leadId,
-            leads.map((l) => l.id)
+          and(
+            inArray(
+              tables.messages.leadId,
+              leads.map((l) => l.id)
+            ),
+            inArray(tables.messages.status, ["sent", "simulated"])
           )
         )
     : [];

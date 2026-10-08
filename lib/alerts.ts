@@ -39,17 +39,20 @@ function leadUrl(leadId: string): string {
   return `${baseUrl()}/lead/${leadId}`;
 }
 
-async function notifyAll(recipients: string[], subject: string, body: string): Promise<void> {
-  await Promise.all(recipients.map((to) => sendPlatformEmail(to, subject, body)));
+/** True if at least one recipient was actually emailed — the bar for "someone was paged." */
+async function notifyAll(recipients: string[], subject: string, body: string): Promise<boolean> {
+  const results = await Promise.all(recipients.map((to) => sendPlatformEmail(to, subject, body)));
+  return results.some(Boolean);
 }
 
+/** Returns whether anyone was actually emailed. */
 export async function notifyHighPriorityLead(
   lead: LeadRow,
   caseFile: AnyCaseFile,
   firmName: string
-): Promise<void> {
+): Promise<boolean> {
   const recipients = await firmRecipients(lead.firmId);
-  if (recipients.length === 0) return;
+  if (recipients.length === 0) return false;
   const name = contactOf(caseFile).name ?? "an unnamed lead";
   const timeCritical = isTimeCritical(caseFile);
   const subject = timeCritical
@@ -80,17 +83,18 @@ export async function notifyHighPriorityLead(
   ]
     .filter((l): l is string => l !== null)
     .join(NL);
-  await notifyAll(recipients, subject, body);
+  return notifyAll(recipients, subject, body);
 }
 
+/** Returns whether anyone was actually emailed. */
 export async function notifyEscalation(
   lead: LeadRow,
   caseFile: AnyCaseFile,
   firmName: string,
   waitedMinutes: number
-): Promise<void> {
+): Promise<boolean> {
   const recipients = await firmRecipients(lead.firmId);
-  if (recipients.length === 0) return;
+  if (recipients.length === 0) return false;
   const name = contactOf(caseFile).name ?? "an unnamed lead";
   const timeCritical = isTimeCritical(caseFile);
   const subject = timeCritical
@@ -106,5 +110,5 @@ export async function notifyEscalation(
     "",
     `Review and approve: ${leadUrl(lead.id)}`,
   ].join(NL);
-  await notifyAll(recipients, subject, body);
+  return notifyAll(recipients, subject, body);
 }

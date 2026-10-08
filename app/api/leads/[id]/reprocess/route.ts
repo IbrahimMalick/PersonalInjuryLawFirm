@@ -6,6 +6,7 @@ import { getDb, tables } from "@/lib/db";
 import { enqueue } from "@/lib/queue";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30; // after()-triggered triage kick needs the room
 
 export async function POST(_request: Request, ctx: { params: Promise<{ id: string }> }) {
   const user = await apiUser();
